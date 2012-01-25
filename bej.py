@@ -258,12 +258,13 @@ def unit_test_random_board(board, diff=0):
     color_hist = [floor(1.1*NROW*NCOL/NCOLOR)]*(NCOLOR)
     color_cumsum = numpy.cumsum(color_hist)
     basic_cnt = 0
-    max_step = NROW*NCOL/4
+    max_step = 1.1*NROW*NCOL/4
     step_threshold = max_step * (9.0-diff)/9.0
+    print 'step threshold', step_threshold
     
     for i in range(4000):
         
-        if basic_cnt >= step_threshold:
+        if basic_cnt > step_threshold:
             break
         
         x0 = random.randint(0, NROW-1)

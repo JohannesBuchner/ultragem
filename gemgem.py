@@ -121,7 +121,7 @@ def runGame():
     else:
         from bej import init_board
         print 'calling my init board'
-        mainBoard = init_board(5)
+        mainBoard = init_board(2)
 
     firstSelectedGem = None
     lastMouseDownX = None
