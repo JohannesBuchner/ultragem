@@ -25,8 +25,9 @@ import pygame
 import sys
 import copy
 from pygame.locals import *
+from bej import *
 
-FPS = 30 # frames per second to update the screen
+FPS = 25 # frames per second to update the screen
 WINDOWWIDTH = 800  # width of the program's window, in pixels
 WINDOWHEIGHT = 600 # height in pixels
 
@@ -43,7 +44,7 @@ NUMGEMIMAGES = 7
 NUMMATCHSOUNDS = 6
 
 MOVERATE = 25 # 1 to 100, larger num means faster animations
-DEDUCTSPEED = 0.8 # reduces score by 1 point every DEDUCTSPEED seconds.
+DEDUCTSPEED = 999999 # reduces score by 1 point every DEDUCTSPEED seconds.
 
 HIGHLIGHTCOLOR = (255, 0, 255) # color of the selected gem's border
 BGCOLOR = (170, 190, 255) # background color on the screen
@@ -112,10 +113,15 @@ def main():
 
 def runGame():
     global score
-    mainBoard = getBlankBoard()
-
-    # Drop the initial gems.
-    fillBoardAndAnimate(mainBoard, [])
+    
+    if 0:
+        mainBoard = getBlankBoard()
+        # Drop the initial gems.
+        fillBoardAndAnimate(mainBoard, [])
+    else:
+        from bej import init_board
+        print 'calling my init board'
+        mainBoard = init_board(5)
 
     firstSelectedGem = None
     lastMouseDownX = None
