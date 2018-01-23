@@ -9,6 +9,14 @@ http://inventwithpython.com/blog/2011/06/24/new-game-source-code-gemgem-a-bejewe
         :width: 100%
         :align: center
 
+Run
+--------
+
+You need pygame installed. Then simply run::
+
+	$ python gemgem.py
+
+
 Wishlist
 ---------
 
