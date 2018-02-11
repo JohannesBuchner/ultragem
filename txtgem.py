@@ -85,7 +85,7 @@ class Board(object):
 				elif type == 4:
 					t += 'X%d' % color
 				elif type == 5:
-					t += '%s #' % s
+					t += '# '
 				if status == 2:
 					s = 'L'
 				elif status == 1:
@@ -186,20 +186,31 @@ class BoardGravityPuller(object):
 				if board.type[j,i] == 0 and board.status[j,i] == 0:
 					# this field is empty
 					# check if field above (or otherwise to the side is filled and can fall)
+					if board.type[j-1,i] == 0 and board.status[j-1,i] == 0:
+						# above is also empty
+						continue
 					if board.type[j-1,i] > 0:
 						self.drop(j-1,i,j,i)
 						changed = True
 						continue
 					left = random.randint(2) * 2 - 1
 					right = -left
-					if 0 <= i+left < ncols and board.type[j-1,i+left] > 0:
+					assert left in [-1,1], left
+					assert right in [-1,1], right
+					assert left != right, (left,right)
+					# maybe down-left/down-right dropping should only be allowed if
+					# the neighbor is filled (supported)
+					if 0 <= i+left < ncols and board.type[j-1,i+left] > 0 and board.type[j,i+left] > 0:
 						self.drop(j-1,i+left,j,i)
 						changed = True
 						continue
-					elif 0 <= i+right < ncols and board.type[j-1,i+right] > 0:
+					elif 0 <= i+right < ncols and board.type[j-1,i+right] > 0 and board.type[j,i+right] > 0:
 						self.drop(j-1,i+right,j,i)
 						changed = True
 						continue
+					#elif 0 <= i+left < ncols and board.type[j-1,i+left] > 0 and 0 <= i+right < ncols and board.type[j-1,i+right] > 0:
+						#print 'not dropping to', j,i,',',board.type[j,i+left],board.type[j,i+right]
+						
 		return changed
 
 class Activater(object):
@@ -215,12 +226,13 @@ class Activater(object):
 		rows, cols = numpy.where(mask)
 		changed = False
 		nchanged = 0
-		print rows.shape, cols.shape
+		#print 'candidates for activation:'
+		#print mask*1
 		idx = numpy.arange(len(rows))
 		numpy.random.shuffle(idx)
 		for j, i in zip(rows[idx], cols[idx]):
 			# deal with that one
-			print j,i, j.shape,i.shape
+			#print j,i, j.shape,i.shape
 			affects_surrounding = False
 			type = self.board.type[j,i]
 			if type == 5:
@@ -231,8 +243,8 @@ class Activater(object):
 				affects_surrounding = True
 			elif type == 4:
 				# explode 3x3
-				loj, hij = max(0, j-1), min(nrows, j+1)
-				loi, hii = max(0, i-1), min(ncols, i+1)
+				loj, hij = max(0, j-1), min(nrows, j+2)
+				loi, hii = max(0, i-1), min(ncols, i+2)
 				mask = numpy.zeros(self.board.shape, dtype=bool)
 				mask[loj:hij,loi:hii] = True
 				affects_surrounding = True
@@ -253,6 +265,7 @@ class Activater(object):
 			elif type == 0:
 				continue
 			
+			#print mask*1, 'activating, type %d' % type
 			# remove this one
 			self.board.status[j,i] = 0
 			self.board.color[j,i] = 0
@@ -361,14 +374,14 @@ class PairCombiner(object):
 				self.activate(rows, cols, fromj, fromi, toj, toi)
 			elif self.board.type[bj,bi] == 4 and self.board.type[aj,ai] == 4:
 				# bomb+bomb -> make 5x5 explosion
-				loj, hij = max(0, toj-2), min(nrows-1, toj+2)
-				loi, hii = max(0, toi-2), min(ncols-1, toi+2)
+				loj, hij = max(0, toj-2), min(nrows, toj+3)
+				loi, hii = max(0, toi-2), min(ncols, toi+3)
 				
 				self.activate(slice(loj,hij), slice(loi,hii), fromj, fromi, toj, toi)
 			elif self.board.type[bj,bi] == 4 and 2 <= self.board.type[aj,ai] <= 3:
 				# bomb+stripe -> eliminate 3xvertical+horizontal from toj,toi
-				loj, hij = max(0, toj-1), min(nrows-1, toj+1)
-				loi, hii = max(0, toi-1), min(ncols-1, toi+1)
+				loj, hij = max(0, toj-1), min(nrows, toj+2)
+				loi, hii = max(0, toi-1), min(ncols, toi+2)
 				
 				self.activate(Ellipsis, slice(loi,hii), fromj, fromi, toj, toi)
 				self.activate(slice(loj,hij), Ellipsis, fromj, fromi, toj, toi)
@@ -400,6 +413,7 @@ class Combiner(object):
 1
 1
 1
+1
 """,
 """V5
 1
@@ -428,18 +442,27 @@ class Combiner(object):
 111
 001
 """,
-	]
-	SHAPES_SIMPLE = [
-"""H3
+"""LUL
+111
+100
+100
+""",
+"""LLL
+100
+100
 111
 """,
-"""V3
-1
-1
-1
+"""LLR
+001
+001
+111
+""",
+"""LUR
+111
+001
+001
 """,
 	]
-		
 	"""
 	Collapses any gem sequences on the current board
 	"""
@@ -498,54 +521,66 @@ class Combiner(object):
 					boardmask = numpy.pad(mask, ((j,nrows-mrows-j), (i,ncols-mcols-i)), 'constant', constant_values=False)
 					assert boardmask.shape == self.board.shape
 					self.log(('found a match:', j,i,name))
+					#print boardmask*1, 'is a match for', name, j, i
 					matches.append((j, i, name, matched_color[0], boardmask))
 		
 		# check for conflicts
 		matches_accepted = []
 		matches_remaining = []
+		self.log(('have %d potential matches' % len(matches)))
 		# if two matches affect the same idx, always choose the longer one
+		#print 'finding non-conflicting matches...'
 		for k, match in enumerate(matches):
 			j, i, name, matched_color, mask = match
 			conflict_status = 0
-			for match in matches[:k] + matches[k+1:]:
-				j2, i2, name2, matched_color2, mask2 = match
+			for match2 in matches[:k] + matches[k+1:]:
+				j2, i2, name2, matched_color2, mask2 = match2
 				if numpy.logical_and(mask, mask2).any():
 					# conflict
 					if mask2.sum() > mask.sum():
 						# there is a larger one, so match should be removed
 						conflict_status = 2
+						#print 'discarding', mask*1, 'because of', mask2*1
 					elif mask2.sum() == mask.sum() and conflict_status == 0:
 						# there is one of the same length
 						conflict_status = 1
-			
+						#print 'stalling', mask*1, 'because of', mask2*1
+				
 			if conflict_status == 0:
 				matches_accepted.append(match)
+				#print 'accepting match', mask*1
 			elif conflict_status == 1:
 				matches_remaining.append(match)
 		
+		print 'extending matches (have %d)...' % (len(matches_accepted))
 		# at this point, we have secure matches in matches_accepted
 		# matches_remaining may have several equally good options.
 		# accept them greedily
 		for match in matches_remaining:
 			j, i, name, matched_color, mask = match
 			conflict_free = True
-			for match in matches_accepted:
-				j2, i2, name2, matched_color2, mask2 = match
+			for match2 in matches_accepted:
+				j2, i2, name2, matched_color2, mask2 = match2
 				if numpy.logical_and(mask, mask2).any():
 					# conflict with already accepted one
 					conflict_free = False
+					#print 'discarding', mask*1, 'because of', mask2*1
 					break
 			
 			if conflict_free:
 				matches_accepted.append(match)
+				#print 'accepting match', mask*1
+			else:
+				#print 'not accepting match', mask*1
+				pass
 		
 		self.log(('acting on matches:'))
 		# we have now a set of matches (ideally just one)
 		changed = len(matches_accepted) > 0
 		for match in matches_accepted:
 			j, i, name, matched_color, mask = match
-			print 'match:', j,i,name,matched_color, 'mask:'
-			print mask*1
+			#print 'match:', j,i,name,matched_color, 'mask:'
+			#print mask*1
 			
 			# explode these (decrease field status, activate or set to empty)
 			
@@ -579,7 +614,7 @@ class Combiner(object):
 					self.board.status[j,i] -= 1
 			
 			# if T.*|X4|X5 replace one location in the pattern with the special item of the right color
-			if name[1] == '4' or name[1] == '5' or name.startswith('T'):
+			if name[1] == '4' or name[1] == '5' or name.startswith('T') or name.startswith('L'):
 				# the preferred location is to, from or random otherwise
 				k = numpy.random.randint(len(rows))
 				j, i = rows[k], cols[k]
@@ -595,7 +630,7 @@ class Combiner(object):
 					self.board.color[j,i] = matched_color
 					self.board.type[j,i] = 3
 					self.board.status[j,i] = 0
-				elif name.startswith('T'):
+				elif name.startswith('T') or name.startswith('L'):
 					self.board.color[j,i] = matched_color
 					self.board.type[j,i] = 4
 					self.board.status[j,i] = 0
@@ -614,31 +649,47 @@ if __name__ == '__main__':
 	print board
 	
 	grav = BoardGravityPuller(board)
-	topfill = TopFiller(board, ncolors=3)
+	topfill = TopFiller(board, ncolors=5)
 	comb = Combiner(board)
 	paircomb = PairCombiner(board)
 	acto = Activater(board)
 	
+	import time
+	T = 0.5
+	time.sleep(T)
+	nstep = 0
 	while True:
 		# dropping phase
-		import time; time.sleep(1)
 		while True:
+			nstep += 1
+			print('STEP %d' % nstep)
 			anychange = grav.run()
-			print board
+			if anychange: 
+				print board, 'grav'
+				time.sleep(T)
+			nstep += 1
+			print('STEP %d' % nstep)
 			anychange += topfill.run()
-			print board
+			if anychange: 
+				print board, 'topfill'
+				time.sleep(T)
 			if not anychange:
 				break
 		
-		print 'combining phase...'
+		nstep += 1
+		print('STEP %d: combining phase...' % nstep)
 		# combining phase
 		anychange  = comb.run()
-		print board
-		print 'activation ...'
-		anychange += acto.run()
-		print board
-		
 		if anychange:
+			print board
+			time.sleep(T)
+		nstep += 1
+		print('STEP %d: activation...' % nstep)
+		anychange += acto.run()
+		if anychange:
+			nstep += 1
+			print board
+			time.sleep(T)
 			continue
 		
 		# ok, the board settled down now
