@@ -58,9 +58,9 @@ field_status = {
 class Board(object):
 	def __init__(self, nrows=10, ncols=10):
 		self.shape = (nrows,ncols)
-		self.type = numpy.zeros(self.shape)
-		self.color = numpy.zeros(self.shape)
-		self.status = numpy.zeros(self.shape)
+		self.type = numpy.zeros(self.shape, dtype=int)
+		self.color = numpy.zeros(self.shape, dtype=int)
+		self.status = numpy.zeros(self.shape, dtype=int)
 	
 	def __str__(self):
 		#return 'BOARD:'
@@ -100,11 +100,12 @@ class InitialFiller(object):
 	"""
 	Fill the board at the start.
 	"""
-	def __init__(self, board, unusable_fraction=0.0, 
-		double_locked_rows=0, double_locked_cols=0):
+	def __init__(self, board, unusable_fraction=0.0,
+		double_locked_rows=0, double_locked_cols=0, lock_border=True):
 		self.board = board
 		self.double_locked_rows = double_locked_rows
 		self.double_locked_cols = double_locked_cols
+		self.lock_border = lock_border
 		self.unusable_fraction = unusable_fraction
 	
 	def run(self):
@@ -126,12 +127,21 @@ class InitialFiller(object):
 		board.type[tuple(top_disable),:] = -1
 		board.type[tuple(bottom_disable),:] = -1
 		
-		# mark some squares as locked
-		# the strategy is to do this symmetrically horizontally
-		board.status[:,:self.double_locked_cols] = 2
-		board.status[:,ncols-self.double_locked_cols:] = 2
-		#board.status[:self.double_locked_rows,:] = 2
-		board.status[nrows-self.double_locked_rows:,:] = 2
+		if self.lock_border:
+			# mark some squares as locked
+			# the strategy is to do this symmetrically horizontally
+			board.status[:,:self.double_locked_cols] = 2
+			board.status[:,ncols-self.double_locked_cols:] = 2
+			#board.status[:self.double_locked_rows,:] = 2
+			board.status[nrows-self.double_locked_rows:,:] = 2
+		else:
+			# mark some squares as locked
+			cols_locked = random.choice(numpy.arange(ncols), size=self.double_locked_cols, replace=False)
+			rows_locked = random.choice(numpy.arange(nrows), size=self.double_locked_rows, replace=False)
+
+			# the strategy is to do this symmetrically horizontally
+			board.status[:,cols_locked] = 2
+			board.status[rows_locked,:] = 2
 		return True
 
 class TopFiller(object):
@@ -317,6 +327,7 @@ class PairCombiner(object):
 		self.board.type[toj, toi] = 0
 		self.board.color[toj, toi] = 0
 		
+		nrows, ncols = self.board.shape
 		# change the status of all the selected fields
 		mask = numpy.zeros(self.board.shape, dtype=bool)
 		mask[rows,cols] = True
@@ -347,51 +358,178 @@ class PairCombiner(object):
 		changed = False
 		# both have to be unlocked and filled
 		nrows, ncols = self.board.shape
-		if self.board.status[fromj,fromi] == 0 and self.board.status[toj,toi] == 0 and self.board.type[fromj,fromi] > 0 and self.board.type[toj,toi] > 0:
-			aj, ai = fromj, fromi
-			bj, bi = toj, toi
-			if self.board.type[aj,ai] > self.board.type[bj,bi]:
-				# switch so that a contains the smaller type
-				aj, ai, bj, bi = bj, bi, aj, ai
+		assert self.board.status[fromj,fromi] == 0, self.board.status[fromj,fromi]
+		assert self.board.status[toj,toi] == 0, self.board.status[toj,toi]
+		assert self.board.type[fromj,fromi] > 0, self.board.type[fromj,fromi]
+		assert self.board.type[toj,toi] > 0, self.board.type[toj,toi]
+		
+		# swap
+		self.board.status[toj, toi], self.board.status[fromj, fromi] = self.board.status[fromj, fromi], self.board.status[toj, toi]
+		self.board.type[toj, toi], self.board.type[fromj, fromi] = self.board.type[fromj, fromi], self.board.type[toj, toi]
+		self.board.color[toj, toi], self.board.color[fromj, fromi] = self.board.color[fromj, fromi], self.board.color[toj, toi]
+		
+		# 
+		aj, ai = fromj, fromi
+		bj, bi = toj, toi
+		if self.board.type[aj,ai] > self.board.type[bj,bi]:
+			# switch so that a contains the smaller type
+			aj, ai, bj, bi = bj, bi, aj, ai
+		
+		if self.board.type[bj,bi] == 5 and self.board.type[aj,ai] == 5:
+			# zapper+zapper -> activate entire board
+			rows, cols = numpy.where(numpy.logical_and(self.board.type > 0, self.board.status == 0))
+			self.activate(rows, cols, fromj, fromi, toj, toi)
+		elif self.board.type[bj,bi] == 5 and 1 <= self.board.type[aj,ai] <= 4:
+			# zapper+something -> change all of that color to bombs/stripe and activate them
+			color = self.board.color[aj,ai]
+			type = self.board.type[aj,ai]
+			rows, cols = numpy.where(numpy.logical_and(numpy.logical_and(self.board.color == color, self.board.type == 1), self.board.status == 0))
+			if type == 4:
+				self.board.type[rows,cols] = type
+			elif type in [2,3]:
+				self.board.type[rows,cols] = 2+numpy.random.randint(1, size=rows.size)
+			elif type == 1: # normal gem
+				# no change. just activate them.
+				pass
 			
-			if self.board.type[bj,bi] == 5 and self.board.type[aj,ai] == 5:
-				# zapper+zapper -> activate entire board
-				rows, cols = numpy.where(numpy.logical_and(self.board.type > 0, self.board.status == 0))
-				self.activate(rows, cols, fromj, fromi, toj, toi)
-			elif self.board.type[bj,bi] == 5 and 1 <= self.board.type[aj,ai] <= 4:
-				# zapper+something -> change all of that color to bombs/stripe and activate them
-				color = self.board.color[aj,ai]
-				type = self.board.type[aj,ai]
-				rows, cols = numpy.where(numpy.logical_and(numpy.logical_and(self.board.color == color, self.board.type == 1), self.board.status == 0))
-				if type == 4:
-					self.board.type[rows,cols] = type
-				elif type in [2,3]:
-					self.board.type[rows,cols] = 2+numpy.random.randint(1, size=rows.size)
-				elif type == 1: # normal gem
-					# no change. just activate them.
-					pass
-				
-				self.activate(rows, cols, fromj, fromi, toj, toi)
-			elif self.board.type[bj,bi] == 4 and self.board.type[aj,ai] == 4:
-				# bomb+bomb -> make 5x5 explosion
-				loj, hij = max(0, toj-2), min(nrows, toj+3)
-				loi, hii = max(0, toi-2), min(ncols, toi+3)
-				
-				self.activate(slice(loj,hij), slice(loi,hii), fromj, fromi, toj, toi)
-			elif self.board.type[bj,bi] == 4 and 2 <= self.board.type[aj,ai] <= 3:
-				# bomb+stripe -> eliminate 3xvertical+horizontal from toj,toi
-				loj, hij = max(0, toj-1), min(nrows, toj+2)
-				loi, hii = max(0, toi-1), min(ncols, toi+2)
-				
-				self.activate(Ellipsis, slice(loi,hii), fromj, fromi, toj, toi)
-				self.activate(slice(loj,hij), Ellipsis, fromj, fromi, toj, toi)
-			elif 2 <= self.board.type[bj,bi] <= 3 and 2 <= self.board.type[aj,ai] <= 3:
-				# stripe+stripe -> eliminate 1xvertical+horizontal from toj,toi
-				self.activate(Ellipsis, toi, fromj, fromi, toj, toi)
-				self.activate(toj, Ellipsis, fromj, fromi, toj, toi)
-				
+			self.activate(rows, cols, fromj, fromi, toj, toi)
+		elif self.board.type[bj,bi] == 4 and self.board.type[aj,ai] == 4:
+			# bomb+bomb -> make 5x5 explosion
+			loj, hij = max(0, toj-2), min(nrows, toj+3)
+			loi, hii = max(0, toi-2), min(ncols, toi+3)
 			
+			self.activate(slice(loj,hij), slice(loi,hii), fromj, fromi, toj, toi)
+		elif self.board.type[bj,bi] == 4 and 2 <= self.board.type[aj,ai] <= 3:
+			# bomb+stripe -> eliminate 3xvertical+horizontal from toj,toi
+			loj, hij = max(0, toj-1), min(nrows, toj+2)
+			loi, hii = max(0, toi-1), min(ncols, toi+2)
 			
+			self.activate(Ellipsis, slice(loi,hii), fromj, fromi, toj, toi)
+			self.activate(slice(loj,hij), Ellipsis, fromj, fromi, toj, toi)
+		elif 2 <= self.board.type[bj,bi] <= 3 and 2 <= self.board.type[aj,ai] <= 3:
+			# stripe+stripe -> eliminate 1xvertical+horizontal from toj,toi
+			self.activate(Ellipsis, toi, fromj, fromi, toj, toi)
+			self.activate(toj, Ellipsis, fromj, fromi, toj, toi)
+	
+	def enumerate_valid_moves_oneway(self):
+		# list valid moves
+		# a move is valid if it either
+		# - leads to a combination of 3 same-color gems
+		# - combines two special gems
+		# - combines zapper with a normal gem
+		nrows, ncols = self.board.shape
+		moves = []
+		Hmoves = []
+		Vmoves = []
+		for fromj in range(nrows-1):
+			for fromi in range(ncols-1):
+				if self.board.status[fromj,fromi] != 0:
+					continue
+				# swap right
+				fromtype = self.board.type[fromj,fromi]
+				toj, toi = fromj, fromi+1
+				# make sure that both are unlocked
+				if self.board.status[toj,toi] == 0:
+					totype = self.board.type[toj,toi]
+					if fromtype > 1 and totype > 1 or (fromtype,totype) in [(5,1),(1,5)]:
+						yield (fromj,fromi,toj,toi)
+					elif fromtype > 0 and totype > 0:
+						Hmoves.append((fromj,fromi,toj,toi))
+				
+				# swap down
+				toj, toi = fromj+1, fromi
+				if self.board.status[toj,toi] == 0:
+					totype = self.board.type[toj,toi]
+					if fromtype > 1 and totype > 1 or (fromtype,totype) in [(5,1),(1,5)]:
+						yield (fromj,fromi,toj,toi)
+					elif fromtype > 0 and totype > 0:
+						Vmoves.append((fromj,fromi,toj,toi))
+		
+		# note: at the moment we are not checking whether things are locked
+		for j,lefti,_,righti in Hmoves:
+			assert (j,lefti) != (j,righti)
+			# horizontal swap can lead to horizontal 3s
+			leftcolor = self.board.color[j,lefti]
+			rightcolor = self.board.color[j,righti]
+			if leftcolor == rightcolor: 
+				# can not swap gems of same color
+				continue
+			# check if next to to(right) are 2 of from-color
+			if righti+2 < ncols and (board.color[j,righti+1:righti+2+1] == leftcolor).all():
+				yield (j,lefti,j,righti)
+			elif lefti >= 2 and (board.color[j,lefti-2:lefti] == rightcolor).all():
+				yield (j,lefti,j,righti)
+			# no horizontal match. Lets find a vertical match
+			# vertical matches can happen if it completes a row
+			# two above are completed at the right position
+			elif j+2 < nrows and (board.color[j+1:j+2+1,righti] == leftcolor).all():
+				yield (j,lefti,j,righti)
+			# two below are completed at the right position
+			elif j >= 2 and (board.color[j-2:j,righti] == leftcolor).all():
+				yield (j,lefti,j,righti)
+			# one above, one below are completed at the right position
+			elif j >= 1 and j+1 < nrows and board.color[j-1,righti] == leftcolor == board.color[j+1,righti]:
+				yield (j,lefti,j,righti)
+			# two below are completed at the left position
+			elif j+2 < nrows and (board.color[j+1:j+2+1,lefti] == rightcolor).all():
+				yield (j,lefti,j,righti)
+			# two above are completed at the left position
+			elif j >= 2 and (board.color[j-2:j,lefti] == rightcolor).all():
+				yield (j,lefti,j,righti)
+			# one above, one below are completed at the left position
+			elif j >= 1 and j+1 < nrows and board.color[j-1,lefti] == rightcolor == board.color[j+1,lefti]:
+				yield (j,lefti,j,righti)
+		
+		for topj,i,bottomj,_ in Vmoves:
+			assert (topj,i) != (bottomj,i)
+			topcolor = self.board.color[topj,i]
+			bottomcolor = self.board.color[bottomj,i]
+			if topcolor == bottomcolor: 
+				# can not swap gems of same color
+				continue
+			# vertical swap can lead to vertical 3s
+			# check if above/below to(bottom) are 2 of from-color
+			if bottomj+2 < nrows and (board.color[bottomj+1:bottomj+2+1,i] == topcolor).all():
+				yield (topj,i,bottomj,i)
+			elif topj >= 2 and (board.color[topj-2:topj] == bottomcolor).all():
+				yield (topj,i,bottomj,i)
+			# no vertical match. Lets find a horizontal match
+			# horizontal matches can happen if it completes a column
+			# two right are completed at the bottom position
+			elif i+2 < ncols and (board.color[bottomj,i+1:i+2+1] == topcolor).all():
+				yield (topj,i,bottomj,i)
+			# two left are completed at the bottom position
+			elif i >= 2 and (board.color[bottomj,i-2:i] == topcolor).all():
+				yield (topj,i,bottomj,i)
+			# one left, one right are completed
+			elif i >= 1 and i+1 < ncols and board.color[bottomj,i-1] == topcolor == board.color[bottomj,i+1]:
+				yield (topj,i,bottomj,i)
+			# two right are completed at the top position
+			elif i+2 < ncols and (board.color[topj,i+1:i+2+1] == bottomcolor).all():
+				yield (topj,i,bottomj,i)
+			# two left are completed at the top position
+			elif i >= 2 and (board.color[topj,i-2:i] == bottomcolor).all():
+				yield (topj,i,bottomj,i)
+			# one right, one left are completed at the top position
+			elif i >= 1 and i+1 < ncols and board.color[topj,i-1] == bottomcolor == board.color[topj,i+1]:
+				yield (topj,i,bottomj,i)
+		
+	def enumerate_valid_moves(self):
+		# for each swap there is the reverse swap also possible,
+		# which makes a difference in special candies (existing or created)
+		for fromj,fromi,toj,toi in self.enumerate_valid_moves_oneway():
+			assert (fromj,fromi) != (toj,toi)
+			yield fromj,fromi,toj,toi
+			#yield toj,toi,fromj,fromi
+	
+	def shuffle(self):
+		mask = numpy.logical_and(self.board.status == 0, self.board.type == 1)
+		irows, icols = numpy.where(mask)
+		idx = numpy.arange(len(irows))
+		numpy.random.shuffle(idx)
+		orows, ocols = irows[idx], icols[idx]
+		self.board.color[orows,ocols] = self.board.color[irows,icols]
+		
 
 class Combiner(object):
 	SHAPES = [
@@ -494,6 +632,7 @@ class Combiner(object):
 		nrows, ncols = self.board.shape
 		matches = []
 		changed = False
+		# someone smart could apply a Boyer-Moore algorithm in 2d here
 		# find longest sequences of gems
 		for j in range(nrows):
 			for i in range(ncols):
@@ -501,26 +640,26 @@ class Combiner(object):
 				for name, mask in self.patterns:
 					mrows, mcols = mask.shape
 					if j + mrows >= nrows or i + mcols >= ncols:
-						self.log((j,i,name,'excluded because outside'))
+						#self.log((j,i,name,'excluded because outside'))
 						continue
 					matched_type = board.type[j:j+mrows,i:i+mcols][mask]
 					if not (matched_type > 0).all():
 						# some non-fields or empty fields
-						self.log((j,i,name,'excluded because non-fields/empty'))
+						#self.log((j,i,name,'excluded because non-fields/empty'))
 						continue
 					matched_status = board.status[j:j+mrows,i:i+mcols][mask]
 					if not (matched_status == 0).all():
 						# some locked fields
-						self.log((j,i,name,'excluded because locked', matched_status))
+						#self.log((j,i,name,'excluded because locked', matched_status))
 						continue
 					matched_color = board.color[j:j+mrows,i:i+mcols][mask]
 					if not (matched_color == matched_color[0]).all():
 						# not all have the same color
-						self.log((j,i,name,'excluded because different colors'))
+						#self.log((j,i,name,'excluded because different colors'))
 						continue
 					boardmask = numpy.pad(mask, ((j,nrows-mrows-j), (i,ncols-mcols-i)), 'constant', constant_values=False)
 					assert boardmask.shape == self.board.shape
-					self.log(('found a match:', j,i,name))
+					#self.log(('found a match:', j,i,name))
 					#print boardmask*1, 'is a match for', name, j, i
 					matches.append((j, i, name, matched_color[0], boardmask))
 		
@@ -639,25 +778,39 @@ class Combiner(object):
 					self.board.type[j,i] = 5
 					self.board.status[j,i] = 0
 		
+		self.fromj, self.fromi = None, None
+		self.toj, self.toi = None, None
+		
 		return changed
 
 if __name__ == '__main__':
 	numpy.random.seed(1)
-	board = Board()
-	print board
-	InitialFiller(board, double_locked_rows=2, double_locked_cols=2).run()
+	scenario = 2
+	
+	if scenario == 0:
+		board = Board(nrows=10, ncols=10)
+		InitialFiller(board, double_locked_rows=2, double_locked_cols=2).run()
+		topfill = TopFiller(board, ncolors=3)
+	elif scenario == 1:
+		board = Board(nrows=10, ncols=10)
+		InitialFiller(board, double_locked_rows=2, double_locked_cols=2).run()
+		topfill = TopFiller(board, ncolors=4)
+	elif scenario == 2:
+		board = Board(nrows=6, ncols=6)
+		InitialFiller(board).run()
+		topfill = TopFiller(board, ncolors=6)
 	print board
 	
 	grav = BoardGravityPuller(board)
-	topfill = TopFiller(board, ncolors=5)
 	comb = Combiner(board)
 	paircomb = PairCombiner(board)
 	acto = Activater(board)
 	
 	import time
-	T = 0.5
+	T = 0.005
 	time.sleep(T)
 	nstep = 0
+	nswaps = 0
 	while True:
 		# dropping phase
 		while True:
@@ -693,11 +846,45 @@ if __name__ == '__main__':
 			continue
 		
 		# ok, the board settled down now
-		# we should ask the user what they want to do now
-		break
-		# comb.set_last_interaction(fromj, fromi, toj, toi)
+		# we should ask the agent/user what they want to do now
+		nstep += 1
+		print('STEP %d: finding valid moves ...' % nstep)
+		moves = list(paircomb.enumerate_valid_moves())
+		if len(moves) == 0:
+			# no moves left -- shuffle
+			print('STEP %d: shuffling ...' % nstep)
+			paircomb.shuffle()
+			print board
+			continue
+			
+		#for fromj,fromi,toj,toi in moves:
+		#	print '  could swap %d|%d -> %d|%d' % (fromj,fromi,toj,toi)
 		
-	
-	
+		# move selector
+		move = moves[-1]
+		
+		nstep += 1
+		print('STEP %d: swapping ...' % nstep)
+		paircomb.run(*move)
+		nswaps += 1
+		comb.set_last_interaction(*move)
+		print board
+
+		nstep += 1
+		print('STEP %d: combining phase...' % nstep)
+		# combining phase
+		anychange  = comb.run()
+		if anychange:
+			print board
+			time.sleep(T)
+
+		nstep += 1
+		print('STEP %d: activation...' % nstep)
+		anychange += acto.run()
+		if anychange:
+			nstep += 1
+			print board
+			time.sleep(T)
+			continue
 
 
