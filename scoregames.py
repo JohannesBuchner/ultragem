@@ -3,6 +3,8 @@ import scipy.stats
 
 def scoring_function(events):
 	nspecial = [0, 0, 0]
+	ncombispecial_index = {22:0,42:1,44:2,51:3,52:4,54:5,55:6}
+	ncombispecial = [0, 0, 0, 0, 0, 0, 0]
 	nunlocked = 0
 	ndestroyed = 0
 	score = 0
@@ -20,7 +22,9 @@ def scoring_function(events):
 		elif type == 'destroyed':
 			ndestroyed += value
 			score += value
-	return [score, ndestroyed, nunlocked] + nspecial
+		elif type == 'combined':
+			ncombispecial[ncombispecial_index[value]] += 1
+	return [score, ndestroyed, nunlocked] + nspecial + ncombispecial
 
 def create_scenario(scenario):
 	if len(scenario) == 1:
@@ -131,7 +135,7 @@ for move_selector, selector_name in zip([worst_move_selector, random_move_select
 			#	print '  could swap %d|%d -> %d|%d' % (fromj,fromi,toj,toi)
 			
 			# move selector
-			move = move_selector(moves)
+			move = move_selector(board, moves)
 			
 			nstep += 1
 			if verbose: print('STEP %d: swapping ...' % nstep)
@@ -163,6 +167,6 @@ for move_selector, selector_name in zip([worst_move_selector, random_move_select
 	print q
 	output.append(q.flatten())
 
-outfilename = 'gamestats_%s.txt' % '_'.join(['%d' % i for i in scenario])
+outfilename = 'gamestats/%s.txt' % '_'.join(['%d' % i for i in scenario])
 numpy.savetxt(outfilename, output, header='scores for worst/random/best move selector strategies. scores are 50% and 95% quantiles (based on 40 games) of: game score, #destroyed, #unlocked, #stripes, #bombs, #zappers', fmt='%d')
 

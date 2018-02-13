@@ -1,5 +1,6 @@
 import sys
 import numpy
+import scipy.signal
 from numpy import random
 from collections import defaultdict, Counter
 
@@ -58,6 +59,15 @@ class Board(object):
 		self.color = numpy.zeros(self.shape, dtype=int)
 		self.status = numpy.zeros(self.shape, dtype=int)
 		self.events = []
+	
+	def copy(self):
+		nrows,ncols = self.shape
+		b = Board(nrows=nrows,ncols=ncols)
+		b.type = self.type.copy()
+		b.color = self.color.copy()
+		b.status = self.status.copy()
+		b.events = list(self.events)
+		return b
 	
 	def __str__(self):
 		#return 'BOARD:'
@@ -390,6 +400,7 @@ class PairCombiner(object):
 		if self.board.type[bj,bi] == 5 and self.board.type[aj,ai] == 5:
 			# zapper+zapper -> activate entire board
 			rows, cols = numpy.where(numpy.logical_and(self.board.type > 0, self.board.status == 0))
+			self.board.events.append(('combined', 55))
 			self.activate(rows, cols, fromj, fromi, toj, toi)
 		elif self.board.type[bj,bi] == 5 and 1 <= self.board.type[aj,ai] <= 4:
 			# zapper+something -> change all of that color to bombs/stripe and activate them
@@ -398,10 +409,13 @@ class PairCombiner(object):
 			rows, cols = numpy.where(numpy.logical_and(numpy.logical_and(self.board.color == color, self.board.type == 1), self.board.status == 0))
 			if type == 4:
 				self.board.type[rows,cols] = type
+				self.board.events.append(('combined', 54))
 			elif type in [2,3]:
 				self.board.type[rows,cols] = 2+numpy.random.randint(1, size=rows.size)
+				self.board.events.append(('combined', 52))
 			elif type == 1: # normal gem
 				# no change. just activate them.
+				self.board.events.append(('combined', 51))
 				pass
 			
 			self.activate(rows, cols, fromj, fromi, toj, toi)
@@ -411,6 +425,7 @@ class PairCombiner(object):
 			loi, hii = max(0, toi-2), min(ncols, toi+3)
 			
 			self.activate(slice(loj,hij), slice(loi,hii), fromj, fromi, toj, toi)
+			self.board.events.append(('combined', 44))
 		elif self.board.type[bj,bi] == 4 and 2 <= self.board.type[aj,ai] <= 3:
 			# bomb+stripe -> eliminate 3xvertical+horizontal from toj,toi
 			loj, hij = max(0, toj-1), min(nrows, toj+2)
@@ -418,10 +433,12 @@ class PairCombiner(object):
 			
 			self.activate(Ellipsis, slice(loi,hii), fromj, fromi, toj, toi)
 			self.activate(slice(loj,hij), Ellipsis, fromj, fromi, toj, toi)
+			self.board.events.append(('combined', 42))
 		elif 2 <= self.board.type[bj,bi] <= 3 and 2 <= self.board.type[aj,ai] <= 3:
 			# stripe+stripe -> eliminate 1xvertical+horizontal from toj,toi
 			self.activate(Ellipsis, toi, fromj, fromi, toj, toi)
 			self.activate(toj, Ellipsis, fromj, fromi, toj, toi)
+			self.board.events.append(('combined', 22))
 	
 	def enumerate_valid_moves_oneway(self):
 		# list valid moves
@@ -630,15 +647,18 @@ class Combiner(object):
 			shapeparts = shapeparts[1:]
 			nrows = len(shapeparts)
 			ncols = len(shapeparts[0])
+			# if pattern is bigger than board, it can never match
+			if nrows > self.board.shape[0]: continue
+			if ncols > self.board.shape[1]: continue
 			maskarr = numpy.array([[c=='1' for c in shaperow] for shaperow in shapeparts])
 			self.log((maskarr*1, name))
 			assert maskarr.shape == (nrows, ncols)
-			self.patterns.append((name, maskarr))
+			self.patterns.append((name, maskarr, maskarr.sum()))
 		self.fromj, self.fromi = None, None
 		self.toj, self.toi = None, None
 	
 	def log(self, *args):
-		#print(*args)
+		#print(args)
 		pass
 	
 	def set_last_interaction(self, fromj,fromi, toj,toi):
@@ -650,37 +670,77 @@ class Combiner(object):
 		nrows, ncols = self.board.shape
 		matches = []
 		changed = False
-		# someone smart could apply a Boyer-Moore algorithm in 2d here
 		# find longest sequences of gems
-		for j in range(nrows):
-			for i in range(ncols):
-				# apply mask here, if possible
-				for name, mask in self.patterns:
-					mrows, mcols = mask.shape
-					if j + mrows >= nrows or i + mcols >= ncols:
-						#self.log((j,i,name,'excluded because outside'))
-						continue
-					matched_type = board.type[j:j+mrows,i:i+mcols][mask]
-					if not (matched_type > 0).all():
-						# some non-fields or empty fields
-						#self.log((j,i,name,'excluded because non-fields/empty'))
-						continue
-					matched_status = board.status[j:j+mrows,i:i+mcols][mask]
-					if not (matched_status == 0).all():
-						# some locked fields
-						#self.log((j,i,name,'excluded because locked', matched_status))
-						continue
-					matched_color = board.color[j:j+mrows,i:i+mcols][mask]
-					if not (matched_color == matched_color[0]).all():
-						# not all have the same color
-						#self.log((j,i,name,'excluded because different colors'))
-						continue
+		if False:
+			for name, mask, Nmask in self.patterns:
+				mrows, mcols = mask.shape
+				for j in range(nrows):
+					for i in range(ncols):
+						if j + mrows >= nrows or i + mcols >= ncols:
+							#self.log((j,i,name,'excluded because outside'))
+						#	assert False
+							continue
+						matched_type = board.type[j:j+mrows,i:i+mcols][mask]
+						if not (matched_type > 0).all():
+							# some non-fields or empty fields
+							#self.log((j,i,name,'excluded because non-fields/empty'))
+							continue
+						matched_status = board.status[j:j+mrows,i:i+mcols][mask]
+						if not (matched_status == 0).all():
+							# some locked fields
+							#self.log((j,i,name,'excluded because locked', matched_status))
+							continue
+						matched_color = board.color[j:j+mrows,i:i+mcols][mask]
+						if not (matched_color == matched_color[0]).all():
+							# not all have the same color
+							#self.log((j,i,name,'excluded because different colors'))
+							continue
+						boardmask = numpy.pad(mask, ((j,nrows-mrows-j), (i,ncols-mcols-i)), 'constant', constant_values=False)
+						assert boardmask.shape == self.board.shape
+						#self.log(('found a match:', j,i,name))
+						#print boardmask*1, 'is a match for', name, j, i
+						matches.append((j, i, name, matched_color[0], boardmask))
+		else:
+			# within mask, these have to be true:scenario2.out3
+			# type has to be > 0
+			# status has to be == 0
+			matchable = numpy.logical_and(self.board.type > 0, self.board.status == 0)
+			# and color has to be the same
+			
+			
+			# the trick here is basically a bitmask. 
+			# colors 1,2,3 are substituted for 10 100 1000
+			# If the result is Nmask * 100, then we have Nmask of color=2. 
+			# That value can not be reached by fewer color=3 stones or more color=1 stones.
+			boardcolors = 10**self.board.color * matchable
+			maxcolor = self.board.color.max()
+			for name, mask, Nmask in self.patterns:
+				#print 'MATCHING:', name
+				mrows, mcols = mask.shape
+				valid_results = 10**numpy.arange(1,maxcolor+1) * Nmask
+				
+				values = scipy.signal.correlate2d(boardcolors, mask, mode='valid')
+				
+				ohas_valid_results = numpy.in1d(values.flatten(), valid_results).reshape(values.shape)
+				colors = numpy.log10(values * 1. / Nmask).astype(int)
+				colors[colors < 0] = 0
+				has_valid_results = 10**colors * Nmask == values
+				#print self.board.color
+				#print values, valid_results*1
+				#print 'where are valid results?:', has_valid_results*1
+				assert numpy.all(has_valid_results == ohas_valid_results), (has_valid_results*1, ohas_valid_results*1)
+				if not has_valid_results.any(): 
+					continue
+				#print numpy.where(has_valid_results, numpy.log10(values/Nmask).astype(int), 0), 'for', name
+				rows, cols = numpy.where(has_valid_results)
+				for j, i, color in zip(rows, cols, colors[has_valid_results]):
 					boardmask = numpy.pad(mask, ((j,nrows-mrows-j), (i,ncols-mcols-i)), 'constant', constant_values=False)
 					assert boardmask.shape == self.board.shape
-					#self.log(('found a match:', j,i,name))
-					#print boardmask*1, 'is a match for', name, j, i
-					matches.append((j, i, name, matched_color[0], boardmask))
+					assert color > 0 and color <= maxcolor, color
+					matches.append((j, i, name, color, boardmask))
 		
+		#print [(name, j, i) for (j, i, name, color, boardmask) in omatches]
+		#print [(name, j, i) for (j, i, name, color, boardmask) in matches]
 		# check for conflicts
 		matches_accepted = []
 		matches_remaining = []
@@ -805,16 +865,65 @@ class Combiner(object):
 		
 		return changed
 
-def best_move_selector(moves):
+def best_move_selector(board, moves):
 	return moves[0][0]
 
-def worst_move_selector(moves):
+def worst_move_selector(board, moves):
 	return moves[-1][0]
 
-def random_move_selector(moves):
+def random_move_selector(board, moves):
 	i = numpy.random.randint(len(moves))
 	return moves[i][0]
 
+def smart_move_selector(board, moves):
+	# store seed and board
+	orig_state = numpy.random.get_state()
+	orig_board = board.copy()
+	totalscores = []
+	for move, score in moves:
+		# emulate move
+		# make a copy of the board here.
+		board.type = orig_board.type.copy()
+		board.status = orig_board.status.copy()
+		board.color = orig_board.color.copy()
+		board.events = list(orig_board.events)
+		
+		# also, set a new seed, and restore later
+		numpy.random.seed(1)
+		
+		paircomb.run(*move)
+		comb.set_last_interaction(*move)
+		anychange  = comb.run()
+		anychange += acto.run()
+		while True:
+			if grav.run(): continue
+			anychange  = comb.run()
+			anychange += acto.run()
+			if anychange:
+				continue
+		# ok, the board settled down now
+		moves = list(paircomb.enumerate_valid_moves())
+		subscore = moves[0][1]
+		intermediatescore = 0
+		
+		for type, value in board.events[len(orig_board.events):]:
+			if type == 'activated':
+				intermediatescore += value*10
+			elif type == 'unlocked':
+				intermediatescore += value
+			elif type == 'destroyed':
+				intermediatescore += value
+			elif type == 'combined':
+				intermediatescore += value*20
+		
+		totalscores.append((score + subscore)*10 + intermediatescore)
+
+	numpy.random.set_state(orig_state)
+	board.type = orig_board.type.copy()
+	board.status = orig_board.status.copy()
+	board.color = orig_board.color.copy()
+	board.events = list(orig_board.events)
+	
 
 if __name__ == '__main__':
 	numpy.random.seed(1)
@@ -836,9 +945,8 @@ if __name__ == '__main__':
 	
 	move_selector = random_move_selector
 	import time
-	T = 0.005
-	waitfunction = lambda: time.sleep(T)
-	waitfunction = id
+	waitfunction = lambda: time.sleep(0.5)
+	waitfunction = lambda: None
 	
 	print board
 	
@@ -859,7 +967,7 @@ if __name__ == '__main__':
 			anychange = grav.run()
 			if anychange: 
 				print board, 'grav'
-				waitfunction(T)
+				waitfunction()
 			nstep += 1
 			print('STEP %d' % nstep)
 			anychange += topfill.run()
@@ -908,7 +1016,7 @@ if __name__ == '__main__':
 		#	print '  could swap %d|%d -> %d|%d' % (fromj,fromi,toj,toi)
 		
 		# move selector
-		move = move_selector(moves)
+		move = move_selector(board, moves)
 		
 		nstep += 1
 		print('STEP %d: swapping ...' % nstep)
