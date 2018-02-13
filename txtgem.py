@@ -570,16 +570,16 @@ class Combiner(object):
 """H3
 111
 """,
+"""V3
+1
+1
+1
+""",
 """H4
 1111
 """,
 """H5
 11111
-""",
-"""V3
-1
-1
-1
 """,
 """V4
 1
@@ -653,7 +653,12 @@ class Combiner(object):
 			maskarr = numpy.array([[c=='1' for c in shaperow] for shaperow in shapeparts])
 			self.log((maskarr*1, name))
 			assert maskarr.shape == (nrows, ncols)
-			self.patterns.append((name, maskarr, maskarr.sum()))
+			needs_H3 = name in ['H4','H5']
+			needs_V3 = name in ['V4','V5']
+			if name[0] in ['T','L']:
+				needs_H3 = True
+				needs_V3 = True
+			self.patterns.append((name, maskarr, maskarr.sum(), needs_H3, needs_V3))
 		self.fromj, self.fromi = None, None
 		self.toj, self.toi = None, None
 	
@@ -671,73 +676,44 @@ class Combiner(object):
 		matches = []
 		changed = False
 		# find longest sequences of gems
-		if False:
-			for name, mask, Nmask in self.patterns:
-				mrows, mcols = mask.shape
-				for j in range(nrows):
-					for i in range(ncols):
-						if j + mrows >= nrows or i + mcols >= ncols:
-							#self.log((j,i,name,'excluded because outside'))
-						#	assert False
-							continue
-						matched_type = board.type[j:j+mrows,i:i+mcols][mask]
-						if not (matched_type > 0).all():
-							# some non-fields or empty fields
-							#self.log((j,i,name,'excluded because non-fields/empty'))
-							continue
-						matched_status = board.status[j:j+mrows,i:i+mcols][mask]
-						if not (matched_status == 0).all():
-							# some locked fields
-							#self.log((j,i,name,'excluded because locked', matched_status))
-							continue
-						matched_color = board.color[j:j+mrows,i:i+mcols][mask]
-						if not (matched_color == matched_color[0]).all():
-							# not all have the same color
-							#self.log((j,i,name,'excluded because different colors'))
-							continue
-						boardmask = numpy.pad(mask, ((j,nrows-mrows-j), (i,ncols-mcols-i)), 'constant', constant_values=False)
-						assert boardmask.shape == self.board.shape
-						#self.log(('found a match:', j,i,name))
-						#print boardmask*1, 'is a match for', name, j, i
-						matches.append((j, i, name, matched_color[0], boardmask))
-		else:
-			# within mask, these have to be true:scenario2.out3
-			# type has to be > 0
-			# status has to be == 0
-			matchable = numpy.logical_and(self.board.type > 0, self.board.status == 0)
-			# and color has to be the same
+		# within mask, these have to be true:scenario2.out3
+		# type has to be > 0
+		# status has to be == 0
+		matchable = numpy.logical_and(self.board.type > 0, self.board.status == 0)
+		# and color has to be the same
+		
+		
+		# the trick here is basically a bitmask. 
+		# colors 1,2,3 are substituted for 10 100 1000
+		# If the result is Nmask * 100, then we have Nmask of color=2. 
+		# That value can not be reached by fewer color=3 stones or more color=1 stones.
+		boardcolors = 10**self.board.color * matchable
+		maxcolor = self.board.color.max()
+		has_H3 = False
+		has_V3 = False
+		for name, mask, Nmask, needs_H3, needs_V3 in self.patterns:
+			if needs_H3 and not has_H3 or needs_V3 and not has_V3:
+				continue
+			#print 'MATCHING:', name
+			values = scipy.signal.correlate2d(boardcolors, mask, mode='valid')
+			colors = numpy.log10(numpy.where(values<=0, 1, values * 1. / Nmask)).astype(int)
+			has_valid_results = 10**colors * Nmask == values
 			
-			
-			# the trick here is basically a bitmask. 
-			# colors 1,2,3 are substituted for 10 100 1000
-			# If the result is Nmask * 100, then we have Nmask of color=2. 
-			# That value can not be reached by fewer color=3 stones or more color=1 stones.
-			boardcolors = 10**self.board.color * matchable
-			maxcolor = self.board.color.max()
-			for name, mask, Nmask in self.patterns:
-				#print 'MATCHING:', name
-				mrows, mcols = mask.shape
-				valid_results = 10**numpy.arange(1,maxcolor+1) * Nmask
-				
-				values = scipy.signal.correlate2d(boardcolors, mask, mode='valid')
-				
-				ohas_valid_results = numpy.in1d(values.flatten(), valid_results).reshape(values.shape)
-				colors = numpy.log10(values * 1. / Nmask).astype(int)
-				colors[colors < 0] = 0
-				has_valid_results = 10**colors * Nmask == values
-				#print self.board.color
-				#print values, valid_results*1
-				#print 'where are valid results?:', has_valid_results*1
-				assert numpy.all(has_valid_results == ohas_valid_results), (has_valid_results*1, ohas_valid_results*1)
-				if not has_valid_results.any(): 
-					continue
-				#print numpy.where(has_valid_results, numpy.log10(values/Nmask).astype(int), 0), 'for', name
-				rows, cols = numpy.where(has_valid_results)
-				for j, i, color in zip(rows, cols, colors[has_valid_results]):
-					boardmask = numpy.pad(mask, ((j,nrows-mrows-j), (i,ncols-mcols-i)), 'constant', constant_values=False)
-					assert boardmask.shape == self.board.shape
-					assert color > 0 and color <= maxcolor, color
-					matches.append((j, i, name, color, boardmask))
+			#print self.board.color
+			#print values, valid_results*1
+			#print 'where are valid results?:', has_valid_results*1
+			if not has_valid_results.any(): 
+				continue
+			if name == 'H3':
+				has_H3 = True
+			elif name == 'V3':
+				has_V3 = True
+			mrows, mcols = mask.shape
+			#print numpy.where(has_valid_results, numpy.log10(values/Nmask).astype(int), 0), 'for', name
+			rows, cols = numpy.where(has_valid_results)
+			for j, i, color in zip(rows, cols, colors[has_valid_results]):
+				boardmask = numpy.pad(mask, ((j,nrows-mrows-j), (i,ncols-mcols-i)), 'constant', constant_values=False)
+				matches.append((j, i, name, color, boardmask))
 		
 		#print [(name, j, i) for (j, i, name, color, boardmask) in omatches]
 		#print [(name, j, i) for (j, i, name, color, boardmask) in matches]
