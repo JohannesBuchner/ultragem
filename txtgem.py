@@ -451,6 +451,7 @@ class PairCombiner(object):
 		moves = []
 		Hmoves = []
 		Vmoves = []
+		
 		for fromj in range(nrows-1):
 			for fromi in range(ncols-1):
 				if self.board.status[fromj,fromi] != 0:
@@ -475,7 +476,7 @@ class PairCombiner(object):
 					elif fromtype > 0 and totype > 0:
 						Vmoves.append((fromj,fromi,toj,toi))
 		
-		# note: at the moment we are not checking whether things are locked
+		# we are not checking whether gems participating in a match are locked
 		for j,lefti,_,righti in Hmoves:
 			assert (j,lefti) != (j,righti)
 			# horizontal swap can lead to horizontal 3s
@@ -712,7 +713,10 @@ class Combiner(object):
 			#print numpy.where(has_valid_results, numpy.log10(values/Nmask).astype(int), 0), 'for', name
 			rows, cols = numpy.where(has_valid_results)
 			for j, i, color in zip(rows, cols, colors[has_valid_results]):
-				boardmask = numpy.pad(mask, ((j,nrows-mrows-j), (i,ncols-mcols-i)), 'constant', constant_values=False)
+				#oboardmask = numpy.pad(mask, ((j,nrows-mrows-j), (i,ncols-mcols-i)), 'constant', constant_values=False)
+				boardmask = numpy.zeros((nrows,ncols))
+				boardmask[j:j+mrows,i:i+mcols] = mask
+				#assert (oboardmask == boardmask).all()
 				matches.append((j, i, name, color, boardmask))
 		
 		#print [(name, j, i) for (j, i, name, color, boardmask) in omatches]
@@ -903,7 +907,7 @@ def smart_move_selector(board, moves):
 
 if __name__ == '__main__':
 	numpy.random.seed(1)
-	scenario = 2
+	scenario = 1
 	
 	maxswaps = 40
 	if scenario == 0:
