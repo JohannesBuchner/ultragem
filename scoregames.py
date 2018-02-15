@@ -48,15 +48,15 @@ def create_scenario(scenario):
 		InitialFiller(board, nrows_disable=nunusablerows, ncols_disable=nunusablecols, 
 		double_locked_rows=nlockrows, double_locked_cols=nlockcols,
 		lock_border=False, rng=rng).run()
-		topfill = TopFiller(board, ncolors=ncolors)
+		topfill = NastyTopFiller(board, ncolors=ncolors)
 	return board, topfill
 
 
-scenario = map(int,sys.argv[1:])
+scenario = list(map(int,sys.argv[1:]))
 
 board, topfill = create_scenario(scenario)
-print 'ANALYSING SCENARIO:', ' '.join(['%d' % i for i in scenario])
-print board
+print('ANALYSING SCENARIO:', ' '.join(['%d' % i for i in scenario]))
+print(board)
 
 maxswaps = 40
 Nruns = 40
@@ -64,7 +64,7 @@ verbose = False
 
 output = []
 
-for move_selector, selector_name in zip([worst_move_selector, random_move_selector, best_move_selector], ['worst', 'random', 'best']):
+for move_selector, selector_name in zip([worst_move_selector, random_move_selector, best_move_selector, smart_move_selector], ['worst', 'random', 'best', 'smart']):
 	scores = []
 	for run in range(Nruns):
 		sys.stderr.write('Game %d/%d with strategy "%s" ...   \r' % (run+1,Nruns, selector_name))
@@ -84,36 +84,36 @@ for move_selector, selector_name in zip([worst_move_selector, random_move_select
 			anychange = True
 			while anychange:
 				nstep += 1
-				if verbose: print('STEP %d' % nstep)
+				if verbose: print(('STEP %d' % nstep))
 				anychange = grav.run()
 				if anychange: 
-					if verbose: print board, 'grav'
+					if verbose: print(board, 'grav')
 				nstep += 1
-				if verbose: print('STEP %d' % nstep)
+				if verbose: print(('STEP %d' % nstep))
 				anychange += topfill.run()
 				if anychange: 
-					if verbose: print board, 'topfill'
+					if verbose: print(board, 'topfill')
 			
 			nstep += 1
-			if verbose: print('STEP %d: combining phase...' % nstep)
+			if verbose: print(('STEP %d: combining phase...' % nstep))
 			# combining phase
 			anychange  = comb.run()
 			if anychange:
-				if verbose: print board
+				if verbose: print(board)
 			nstep += 1
-			if verbose: print('STEP %d: activation...' % nstep)
+			if verbose: print(('STEP %d: activation...' % nstep))
 			anychange += acto.run()
 			if anychange:
 				ncomb += 1
 				nstep += 1
-				if verbose: print board
+				if verbose: print(board)
 				continue
 			
 			if nswaps >= maxswaps:
-				if verbose: print 'moves used up.'
+				if verbose: print('moves used up.')
 				break
 			if ncomb > (nswaps + 1) * 40:
-				print 'STOPPING TRIVIAL GAME'
+				print('STOPPING TRIVIAL GAME')
 				break
 			if nshuffles > 100:
 				raise Exception('STOPPING UNPLAYABLE GAME (many shuffles)')
@@ -121,14 +121,14 @@ for move_selector, selector_name in zip([worst_move_selector, random_move_select
 			# ok, the board settled down now
 			# we should ask the agent/user what they want to do now
 			nstep += 1
-			if verbose: print('STEP %d: finding valid moves ...' % nstep)
+			if verbose: print(('STEP %d: finding valid moves ...' % nstep))
 			moves = list(paircomb.enumerate_valid_moves())
 			if len(moves) == 0:
 				# no moves left -- shuffle
-				if verbose: print('STEP %d: shuffling ...' % nstep)
+				if verbose: print(('STEP %d: shuffling ...' % nstep))
 				nshuffles += 1
 				paircomb.shuffle()
-				if verbose: print board
+				if verbose: print(board)
 				continue
 				
 			#for fromj,fromi,toj,toi in moves:
@@ -138,35 +138,35 @@ for move_selector, selector_name in zip([worst_move_selector, random_move_select
 			move = move_selector(board, moves)
 			
 			nstep += 1
-			if verbose: print('STEP %d: swapping ...' % nstep)
+			if verbose: print(('STEP %d: swapping ...' % nstep))
 			paircomb.run(*move)
 			nswaps += 1
 			comb.set_last_interaction(*move)
-			if verbose: print board
+			if verbose: print(board)
 
 			nstep += 1
-			if verbose: print('STEP %d: combining phase...' % nstep)
+			if verbose: print(('STEP %d: combining phase...' % nstep))
 			# combining phase
 			anychange  = comb.run()
 			if anychange:
-				if verbose: print board
+				if verbose: print(board)
 
 			nstep += 1
-			if verbose: print('STEP %d: activation...' % nstep)
+			if verbose: print(('STEP %d: activation...' % nstep))
 			anychange += acto.run()
 			if anychange:
 				nstep += 1
-				if verbose: print board
+				if verbose: print(board)
 				continue
 		scores.append(scoring_function(board.events))
 	
 	sys.stderr.write('\n')
 	scores = numpy.array(scores)
-	print selector_name
+	print(selector_name)
 	q = scipy.stats.mstats.mquantiles(scores, [0.5, 0.95], axis=0).astype(int)
-	print q
+	print(q)
 	output.append(q.flatten())
 
 outfilename = 'gamestats/%s.txt' % '_'.join(['%d' % i for i in scenario])
-numpy.savetxt(outfilename, output, header='scores for worst/random/best move selector strategies. scores are 50% and 95% quantiles (based on 40 games) of: game score, #destroyed, #unlocked, #stripes, #bombs, #zappers', fmt='%d')
+numpy.savetxt(outfilename, output, header='scores for worst/random/best/smart move selector strategies. scores are 50% and 95% quantiles (based on 40 games) of: game score, #destroyed, #unlocked, #stripes, #bombs, #zappers', fmt='%d')
 

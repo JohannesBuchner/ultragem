@@ -179,6 +179,64 @@ class TopFiller(object):
 				changed = True
 		return changed
 
+class NastyTopFiller(object):
+	"""
+	Refills the board from the top, if there are empty fields.
+	
+	Prefers not to use the color of neighbors of the empty field where
+	the gem would end up in.
+	"""
+	def __init__(self, board, ncolors, locked_empty_fraction=0.0):
+		self.board = board
+		self.ncolors = ncolors
+		self.locked_empty_fraction = locked_empty_fraction
+	def run(self):
+		board = self.board
+		nrows, ncols = board.shape
+		changed = False
+		# handle empty cells:
+		for i in range(ncols):
+			if board.type[0,i] == 0 and board.status[0,i] == 0:
+				if random.uniform() < self.locked_empty_fraction:
+					# locked, colorless
+					board.type[0,i] = 0
+					board.color[0,i] = 0
+					board.status[0,i] = 1
+				else:
+					# normal, not locked, simple things
+					# find the offset where it will end up
+					# go down and count until a locked one is found
+					mask = numpy.logical_and(board.type[:,i] >= 0, board.status[0,i] <= 0)
+					j = 0
+					for jnext in range(len(mask)):
+						if not mask[j]: break
+						j = jnext
+					# count the number of empty ones until there
+					mask = numpy.logical_and(board.type[:,i] == 0, board.status[0,i] == 0)
+					offset = mask[:j+1].sum()
+					
+					# now we presume that it will end up there.
+					bad_colors = set()
+					if i+1<ncols:
+						bad_colors.add(board.color[j,i+1])
+					if i-1>=0:
+						bad_colors.add(board.color[j,i-1])
+					if j+1<nrows:
+						bad_colors.add(board.color[j+1,i])
+					
+					# try twice to avoid these colors
+					color = 1 + random.randint(self.ncolors)
+					if color in bad_colors:
+						color = 1 + random.randint(self.ncolors)
+						if color in bad_colors:
+							color = 1 + random.randint(self.ncolors)
+					
+					board.type[0,i] = 1
+					board.color[0,i] = color
+					board.status[0,i] = 0
+				changed = True
+		return changed
+
 class BoardGravityPuller(object):
 	"""
 	Makes gems fall down if there are empty fields below
@@ -257,7 +315,10 @@ class Activater(object):
 			if type == 5:
 				# choose a random color and mark those for explosion
 				colors = numpy.unique(self.board.color)
-				color = numpy.random.choice(colors[colors > 0])
+				if len(colors[colors > 0]) == 0:
+					color = 1
+				else:
+					color = numpy.random.choice(colors[colors > 0])
 				mask = self.board.color == color
 				affects_surrounding = True
 			elif type == 4:
@@ -870,20 +931,27 @@ def smart_move_selector(board, moves):
 		
 		# also, set a new seed, and restore later
 		numpy.random.seed(1)
+
+		grav = BoardGravityPuller(board)
+		comb = Combiner(board)
+		paircomb = PairCombiner(board)
+		acto = Activater(board)
 		
 		paircomb.run(*move)
 		comb.set_last_interaction(*move)
 		anychange  = comb.run()
 		anychange += acto.run()
-		while True:
+		while anychange:
 			if grav.run(): continue
 			anychange  = comb.run()
 			anychange += acto.run()
-			if anychange:
-				continue
+		
 		# ok, the board settled down now
-		moves = list(paircomb.enumerate_valid_moves())
-		subscore = moves[0][1]
+		submoves = list(paircomb.enumerate_valid_moves())
+		if len(submoves) == 0:
+			subscore = 0
+		else:
+			subscore = submoves[0][1]
 		intermediatescore = 0
 		
 		for type, value in board.events[len(orig_board.events):]:
@@ -904,6 +972,8 @@ def smart_move_selector(board, moves):
 	board.color = orig_board.color.copy()
 	board.events = list(orig_board.events)
 	
+	totalscore, (move, _score) = max(zip(totalscores, moves))
+	return move
 
 if __name__ == '__main__':
 	numpy.random.seed(1)
@@ -928,7 +998,7 @@ if __name__ == '__main__':
 	waitfunction = lambda: time.sleep(0.5)
 	waitfunction = lambda: None
 	
-	print board
+	print(board)
 	
 	grav = BoardGravityPuller(board)
 	comb = Combiner(board)
@@ -943,53 +1013,53 @@ if __name__ == '__main__':
 		# dropping phase
 		while True:
 			nstep += 1
-			print('STEP %d' % nstep)
+			print(('STEP %d' % nstep))
 			anychange = grav.run()
 			if anychange: 
-				print board, 'grav'
+				print(board, 'grav')
 				waitfunction()
 			nstep += 1
-			print('STEP %d' % nstep)
+			print(('STEP %d' % nstep))
 			anychange += topfill.run()
 			if anychange: 
-				print board, 'topfill'
+				print(board, 'topfill')
 				waitfunction()
 			if not anychange:
 				break
 		
 		nstep += 1
-		print('STEP %d: combining phase...' % nstep)
+		print(('STEP %d: combining phase...' % nstep))
 		# combining phase
 		anychange  = comb.run()
 		if anychange:
-			print board
+			print(board)
 			waitfunction()
 		nstep += 1
-		print('STEP %d: activation...' % nstep)
+		print(('STEP %d: activation...' % nstep))
 		anychange += acto.run()
 		if anychange:
 			ncomb += 1
 			nstep += 1
-			print board
+			print(board)
 			waitfunction()
 			continue
 		
 		if nswaps >= maxswaps:
-			print 'moves used up.'
+			print('moves used up.')
 			break
 		if ncomb > (nswaps + 1) * 40:
-			print 'STOPPING TRIVIAL GAME'
+			print('STOPPING TRIVIAL GAME')
 			break
 		# ok, the board settled down now
 		# we should ask the agent/user what they want to do now
 		nstep += 1
-		print('STEP %d: finding valid moves ...' % nstep)
+		print(('STEP %d: finding valid moves ...' % nstep))
 		moves = list(paircomb.enumerate_valid_moves())
 		if len(moves) == 0:
 			# no moves left -- shuffle
-			print('STEP %d: shuffling ...' % nstep)
+			print(('STEP %d: shuffling ...' % nstep))
 			paircomb.shuffle()
-			print board
+			print(board)
 			continue
 			
 		#for fromj,fromi,toj,toi in moves:
@@ -999,26 +1069,26 @@ if __name__ == '__main__':
 		move = move_selector(board, moves)
 		
 		nstep += 1
-		print('STEP %d: swapping ...' % nstep)
+		print(('STEP %d: swapping ...' % nstep))
 		paircomb.run(*move)
 		nswaps += 1
 		comb.set_last_interaction(*move)
-		print board
+		print(board)
 
 		nstep += 1
-		print('STEP %d: combining phase...' % nstep)
+		print(('STEP %d: combining phase...' % nstep))
 		# combining phase
 		anychange  = comb.run()
 		if anychange:
-			print board
+			print(board)
 			waitfunction()
 
 		nstep += 1
-		print('STEP %d: activation...' % nstep)
+		print(('STEP %d: activation...' % nstep))
 		anychange += acto.run()
 		if anychange:
 			nstep += 1
-			print board
+			print(board)
 			waitfunction()
 			continue
 
