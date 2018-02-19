@@ -1,5 +1,6 @@
 from txtgem import *
 import scipy.stats
+import os
 
 def scoring_function(events):
 	nspecial = [0, 0, 0]
@@ -46,8 +47,17 @@ def create_scenario(scenario):
 		rng = numpy.random.RandomState(seed)
 		board = Board(nrows=nrows, ncols=ncols)
 		InitialFiller(board, nrows_disable=nunusablerows, ncols_disable=nunusablecols, 
-		double_locked_rows=nlockrows, double_locked_cols=nlockcols,
-		lock_border=False, rng=rng).run()
+			double_locked_rows=nlockrows, double_locked_cols=nlockcols,
+			lock_border=False, rng=rng).run()
+		for i in range(1, seed):
+			rng = numpy.random.RandomState(i)	
+			board2 = Board(nrows=nrows, ncols=ncols)
+			InitialFiller(board2, nrows_disable=nunusablerows, ncols_disable=nunusablecols, 
+				double_locked_rows=nlockrows, double_locked_cols=nlockcols,
+				lock_border=False, rng=rng).run()
+			if (board2.status == board.status).all() and (board2.type == board.type).all() and (board2.color == board.color).all():
+				raise Exception("Board with seed=%d same as seed=%d" % (i, seed))
+		
 		topfill = NastyTopFiller(board, ncolors=ncolors)
 	return board, topfill
 
@@ -63,6 +73,11 @@ Nruns = 40
 verbose = False
 
 output = []
+outfilename = 'gamestats/%s.txt' % '_'.join(['%d' % i for i in scenario])
+
+if os.path.exists(outfilename):
+	print('Already analysed.')
+	sys.exit(0)
 
 for move_selector, selector_name in zip([worst_move_selector, random_move_selector, best_move_selector, smart_move_selector], ['worst', 'random', 'best', 'smart']):
 	scores = []
@@ -113,8 +128,11 @@ for move_selector, selector_name in zip([worst_move_selector, random_move_select
 				if verbose: print('moves used up.')
 				break
 			if ncomb > (nswaps + 1) * 40:
-				print('STOPPING TRIVIAL GAME')
-				break
+				if selector_name in ['random', 'worst']:
+					raise Exception('STOPPING UNPLAYABLE GAME (many shuffles)')
+				else:
+					print('STOPPING TRIVIAL GAME')
+					break
 			if nshuffles > 100:
 				raise Exception('STOPPING UNPLAYABLE GAME (many shuffles)')
 				break
@@ -167,6 +185,5 @@ for move_selector, selector_name in zip([worst_move_selector, random_move_select
 	print(q)
 	output.append(q.flatten())
 
-outfilename = 'gamestats/%s.txt' % '_'.join(['%d' % i for i in scenario])
 numpy.savetxt(outfilename, output, header='scores for worst/random/best/smart move selector strategies. scores are 50% and 95% quantiles (based on 40 games) of: game score, #destroyed, #unlocked, #stripes, #bombs, #zappers', fmt='%d')
 
