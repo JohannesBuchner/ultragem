@@ -107,50 +107,93 @@ class InitialFiller(object):
 	"""
 	Fill the board at the start.
 	"""
-	def __init__(self, board, nrows_disable=0, ncols_disable=0,
-		double_locked_rows=0, double_locked_cols=0, lock_border=True, rng=None):
+	def __init__(self, board, nrows=0, ncols=0, rng=None):
 		self.board = board
-		self.double_locked_rows = double_locked_rows
-		self.double_locked_cols = double_locked_cols
-		self.nrows_disable = nrows_disable
-		self.ncols_disable = ncols_disable
-		self.lock_border = lock_border
-		#self.unusable_fraction = unusable_fraction
+		self.nrows = nrows
+		self.ncols = ncols
 		self.rng = rng
+	
+	def apply(self, rows, cols):
+		raise NotImplementedError()
+		self.board.type[rows, cols] = -1
+		self.board.color[rows, cols] = 0
+		self.board.status[rows, cols] = 0
+
+		self.board.status[rows, cols] = 2
+		self.board.status[rows, cols] = 2
 	
 	def run(self):
 		# mark some squares as out-of-service
 		nrows, ncols = self.board.type.shape
 		
 		# choose some columns and rows at random and mark them as out-of-service
-		if self.ncols_disable > 0 or self.nrows_disable:
-			left_disable = self.rng.choice(numpy.arange(ncols), size=self.ncols_disable, replace=False)
-			right_disable = ncols - left_disable - 1
-			bottom_disable = self.rng.choice(numpy.arange(nrows), size=self.nrows_disable, replace=False)
-			top_disable = nrows - bottom_disable - 1
-			
-			self.board.type[:,tuple(top_disable)] = -1
-			self.board.type[:,tuple(bottom_disable)] = -1
-			self.board.type[tuple(top_disable),:] = -1
-			self.board.type[tuple(bottom_disable),:] = -1
+		if self.ncols > 0:
+			leftright_mirror = numpy.random.uniform() < 0.9
+			if leftright_mirror:
+				left = self.rng.choice(numpy.arange(ncols), size=self.ncols / 2, replace=False)
+				right = ncols - left - 1
+				cols = numpy.hstack((left, right))
+			else:
+				cols = self.rng.choice(numpy.arange(ncols), size=self.ncols, replace=False)
+			half_fill = numpy.random.uniform() > 0.9
+			if half_fill:
+				if numpy.random.uniform() > 0.5:
+					self.apply(slice(1,None,2), cols)
+				else:
+					self.apply(slice(None,-1,2), cols)
+			else:
+				self.apply(Ellipsis,cols)
+		if self.nrows > 0:
+			# make lower rows more likely to be selected
+			p = 1. / (1 + numpy.arange(nrows)[::-1])
+			p /= p.sum()
+			rows = self.rng.choice(numpy.arange(nrows), size=self.nrows, replace=False, p=p)
+			half_fill = numpy.random.uniform() > 0.9
+			if half_fill:
+				if numpy.random.uniform() > 0.5:
+					self.apply(rows, slice(1,None,2))
+				else:
+					self.apply(rows, slice(None,-1,2))
+			else:
+				self.apply(rows, Ellipsis)
 		
-		if self.lock_border:
-			# mark some squares as locked
-			# the strategy is to do this symmetrically horizontally
-			self.board.status[:,:self.double_locked_cols] = 2
-			self.board.status[:,ncols-self.double_locked_cols:] = 2
-			#board.status[:self.double_locked_rows,:] = 2
-			self.board.status[nrows-self.double_locked_rows:,:] = 2
-		else:
-			# mark some squares as locked
-			cols_locked = self.rng.choice(numpy.arange(ncols), size=self.double_locked_cols, replace=False)
-			rows_locked = self.rng.choice(numpy.arange(nrows), size=self.double_locked_rows, replace=False)
-
-			# the strategy is to do this symmetrically horizontally
-			self.board.status[:,cols_locked] = 2
-			self.board.status[rows_locked,:] = 2
 		return True
 
+class InitialFillerDoubleLock(InitialFiller):
+	"""
+	Fills with double-locked, useless blocks
+	"""
+	def apply(self, rows, cols):
+		self.board.status[rows, cols] = 2
+		self.board.color[rows, cols] = 0
+		self.board.type[rows, cols] = 0
+
+class InitialFillerDisable(InitialFiller):
+	"""
+	Removes fields
+	"""
+	def apply(self, rows, cols):
+		self.board.type[rows, cols] = -1
+		self.board.color[rows, cols] = 0
+
+class InitialFillerDoubleLockSpecial(InitialFiller):
+	"""
+	Fills with double-locked special items
+	"""
+	def __init__(self, board, ncolors, types = [2,3,4,5], nrows=0, ncols=0, rng=None):
+		self.board = board
+		self.nrows = nrows
+		self.ncols = ncols
+		self.ncolors = ncolors
+		self.types = types
+		self.rng = rng
+		
+	def apply(self, rows, cols):
+		selshape = self.board.status[rows, cols].shape
+		self.board.status[rows, cols] = 2
+		self.board.type[rows, cols] = self.rng.choice(self.types, size=selshape)
+		self.board.color[rows, cols] = self.rng.randint(self.ncolors, size=selshape)
+	
 class TopFiller(object):
 	"""
 	Refills the board from the top, if there are empty fields
