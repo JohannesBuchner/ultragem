@@ -29,7 +29,7 @@ import sys
 import copy
 import numpy
 from pygame.locals import QUIT, KEYUP, K_ESCAPE, K_BACKSPACE, MOUSEBUTTONUP, MOUSEBUTTONDOWN
-from txtgem import Board, InitialFillerDoubleLockSpecial, InitialFillerDoubleLock, InitialFillerDisable, NastyTopFiller, BoardGravityPuller, Combiner, PairCombiner, Activater
+from gemengine import Board, InitialFillerDoubleLockSpecial, InitialFillerDoubleLock, InitialFillerDisable, NastyTopFiller, BoardGravityPuller, Combiner, PairCombiner, Activater
 
 FPS = 60 # frames per second to update the screen
 WINDOWWIDTH = 800  # width of the program's window, in pixels

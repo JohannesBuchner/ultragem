@@ -1,4 +1,4 @@
-from txtgem import *
+from gemengine import *
 
 def check_board(test_steps, steps, prevboard2, newboard2):
 	steps.append((prevboard2, newboard2))

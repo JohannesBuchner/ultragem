@@ -1,4 +1,4 @@
-from txtgem import *
+from gemengine import *
 import scipy.stats
 import os
 
