@@ -1,6 +1,7 @@
 #!/bin/bash
 
 i=0
+echo "extracting fire ..."
 for a in 0 1 2 3 4; do
 for b in 0 1 2 3 4 5; do
 
@@ -14,13 +15,14 @@ done
 
 
 
-for locked in N 2 3
+for locked in N X 2 3
 do
 
+echo "mixing gems with lock $locked ..."
 for base in 1 2 3 4 5 6 7
 do
 # stripes, bombs
-for modifier in N horizontal vertical square
+for modifier in N stripeH stripeV bomb
 do
 
 outfilename="comb${locked}-${base}-${modifier}.png"
@@ -37,19 +39,24 @@ else
 cmd1="$cmd0 gem${modifier}.png -composite"
 fi
 
-echo $cmd1 $outfilename
+$cmd1 $outfilename
 
 done
 
 done
 
-base="spark"
+echo "making spark ..."
+
+base="N"
+modifier='spark'
+outfilename="comb${locked}-${base}-${modifier}.png"
+
 if [[ "$locked" == "N" ]]; then
-cmd0="convert gem${base}.png"
+cmd0="convert gem${modifier}.png"
 else
-cmd0="convert gem${locked}.png gem${base}.png -composite"
+cmd0="convert gem${locked}.png gem${modifier}.png -composite"
 fi
-echo $cmd0 $outfilename
+$cmd0 $outfilename
 
 done
 

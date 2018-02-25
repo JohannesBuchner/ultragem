@@ -562,15 +562,15 @@ class PairCombiner(object):
 		Hmoves = []
 		Vmoves = []
 		
-		for fromj in range(nrows-1):
-			for fromi in range(ncols-1):
+		for fromj in range(nrows):
+			for fromi in range(ncols):
 				if self.board.status[fromj,fromi] != 0:
 					continue
 				# swap right
 				fromtype = self.board.type[fromj,fromi]
 				toj, toi = fromj, fromi+1
 				# make sure that both are unlocked
-				if self.board.status[toj,toi] == 0:
+				if toi < ncols and self.board.status[toj,toi] == 0:
 					totype = self.board.type[toj,toi]
 					if fromtype > 1 and totype > 1 or (fromtype,totype) in [(5,1),(1,5)]:
 						yield (fromj,fromi,toj,toi,fromtype+totype)
@@ -579,7 +579,7 @@ class PairCombiner(object):
 				
 				# swap down
 				toj, toi = fromj+1, fromi
-				if self.board.status[toj,toi] == 0:
+				if toj < nrows and self.board.status[toj,toi] == 0:
 					totype = self.board.type[toj,toi]
 					if fromtype > 1 and totype > 1 or (fromtype,totype) in [(5,1),(1,5)]:
 						yield (fromj,fromi,toj,toi,fromtype+totype)

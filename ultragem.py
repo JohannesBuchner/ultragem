@@ -48,8 +48,9 @@ NUMMATCHSOUNDS = 6
 
 MOVERATE = 5 # 1 to 100, larger num means faster animations
 
-HIGHLIGHTCOLOR = (255, 0, 255) # color of the selected gem's border
+HIGHLIGHTCOLOR = (0, 255, 255) # color of the selected gem's border
 BGCOLOR = (170, 190, 255) # background color on the screen
+#BGCOLOR = (255, 255, 255) # background color on the screen
 GRIDCOLOR = (0, 0, 255) # color of the game board
 GAMEOVERCOLOR = (255, 100, 100) # color of the "Game over" text.
 GAMEOVERBGCOLOR = (0, 0, 0) # background color of the "Game over" text.
@@ -89,13 +90,24 @@ class UltraGemGame(object):
 		self.BASICFONT = pygame.font.Font('freesansbold.ttf', 36)
 
 		# Load the images
-		GEMIMAGES = []
-		for i in range(1,NUMGEMIMAGES+1):
-			gemImage = pygame.image.load('gem%s.png' % i)
+		self.GEMIMAGES = {}
+		for lock, status in ('N',0), ('X', -1), ('2',1), ('3',2):
+			for modifier, type in ('N',1), ('stripeH',2), ('stripeV',3), ('bomb',4):
+				for color in range(NUMGEMIMAGES):
+					i = color + 1
+					print('loading comb%s-%s-%s.png for %d,%d,%d' % (lock, i, modifier, status, type, color))
+					gemImage = pygame.image.load('comb%s-%s-%s.png' % (lock, i, modifier))
+					if gemImage.get_size() != (GEMIMAGESIZE, GEMIMAGESIZE):
+						gemImage = pygame.transform.smoothscale(gemImage, (GEMIMAGESIZE, GEMIMAGESIZE))
+					self.GEMIMAGES[(status, type, color)] = gemImage
+			
+			modifier, type = 'spark', 5
+			i = 'N'
+			gemImage = pygame.image.load('comb%s-%s-%s.png' % (lock, i, modifier))
 			if gemImage.get_size() != (GEMIMAGESIZE, GEMIMAGESIZE):
 				gemImage = pygame.transform.smoothscale(gemImage, (GEMIMAGESIZE, GEMIMAGESIZE))
-			GEMIMAGES.append(gemImage)
-		self.GEMIMAGES = GEMIMAGES
+			self.GEMIMAGES[(status, type, 0)] = gemImage
+		#print('images loaded:', self.GEMIMAGES.keys())
 
 		FIREIMAGES = []
 		for i in range(1,NUMFIREIMAGES+1):
@@ -183,18 +195,20 @@ class UltraGemGame(object):
 						directiony = 1
 					else:
 						assert False, move 
-					movingGems.append(dict(imageNum=self.board.color[j,i] - 1, 
+					assert self.getImageNum(j,i) != -1
+					movingGems.append(dict(imageNum=self.getImageNum(j,i), 
 						x=i-directionx, y=j-directiony, 
 						directionx=directionx, directiony=directiony))
 
 				changes = self.topfill.run()
-				anychange = anychange or len(changes) > 0
+				anychange = len(changes) > 0 or anychange
 				#print('topfill changes:', changes, anychange)
 				print(self.board)
 				for j, i, move in changes:
 					directionx = 0
 					directiony = 1
-					movingGems.append(dict(imageNum=self.board.color[j,i] - 1, 
+					assert self.getImageNum(j,i) != -1
+					movingGems.append(dict(imageNum=self.getImageNum(j,i), 
 						x=i-directionx, y=j-directiony, 
 						directionx=directionx, directiony=directiony))
 
@@ -208,7 +222,7 @@ class UltraGemGame(object):
 			#print('final board:', board)
 			
 			# combining phase
-			anychanges = self.comb.run()
+			anychange = self.comb.run()
 			if anychange:
 				# have to find the differences and transition
 				# using fire
@@ -298,15 +312,24 @@ class UltraGemGame(object):
 				boardCopy[gem['x']][gem['y']] = EMPTY_SPACE
 		return boardCopy
 	
+	def getImageNum(self, j, i):
+		color = self.board.color[j,i]
+		type = self.board.type[j,i]
+		status = self.board.status[j,i]
+		
+		if type == 0:
+			return EMPTY_SPACE
+		else:
+			if type == 5:
+				color = 0
+		if type > 1:
+			print((status, type, color))
+		return (status, type, color)
+	
 	def updateBoard(self, board):
 		for x in range(self.BOARDWIDTH):
 			for y in range(self.BOARDHEIGHT):
-				color = self.board.color[y,x]
-				type = self.board.type[y,x]
-				if type == 0 or color == 0:
-					board[x][y] = EMPTY_SPACE
-				else:
-					board[x][y] = color - 1
+				board[x][y] = self.getImageNum(y,x)
 	
 	def moveGems(self, board, movingGems):
 		# movingGems is a list of dicts with keys 'x', 'y', 'direction', and 'imageNum'
@@ -524,8 +547,13 @@ class UltraGemGame(object):
 					mainBoard[firstSwappingGem['x']][firstSwappingGem['y']] = secondSwappingGem['imageNum']
 					mainBoard[secondSwappingGem['x']][secondSwappingGem['y']] = firstSwappingGem['imageNum']
 				else:
+					# successful move. 
+					# reset selection
+					firstSelectedGem = None
+					secondSwappingGem = None
 					nswaps += 1
 					self.possible_moves = self.continueGame(mainBoard, move)
+					
 					
 					if nswaps > 40:
 						isGameOver = True
