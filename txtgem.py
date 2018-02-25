@@ -205,7 +205,7 @@ class TopFiller(object):
 	def run(self):
 		board = self.board
 		nrows, ncols = board.shape
-		changed = False
+		changed = []
 		# handle empty cells:
 		for i in range(ncols):
 			if board.type[0,i] == 0 and board.status[0,i] == 0:
@@ -219,7 +219,7 @@ class TopFiller(object):
 					board.type[0,i] = 1
 					board.color[0,i] = 1 + random.randint(self.ncolors)
 					board.status[0,i] = 0
-				changed = True
+				changed.append([0,i,'topfilled'])
 		return changed
 
 class NastyTopFiller(object):
@@ -236,8 +236,9 @@ class NastyTopFiller(object):
 	def run(self):
 		board = self.board
 		nrows, ncols = board.shape
-		changed = False
+		changed = []
 		# handle empty cells:
+		lastcolor = -1
 		for i in range(ncols):
 			if board.type[0,i] == 0 and board.status[0,i] == 0:
 				if random.uniform() < self.locked_empty_fraction:
@@ -249,24 +250,28 @@ class NastyTopFiller(object):
 					# normal, not locked, simple things
 					# find the offset where it will end up
 					# go down and count until a locked one is found
-					mask = numpy.logical_and(board.type[:,i] >= 0, board.status[0,i] <= 0)
+					mask = board.status[:,i] == 2
 					j = 0
 					for jnext in range(len(mask)):
-						if not mask[j]: break
+						if mask[j]: break
 						j = jnext
 					# count the number of empty ones until there
 					mask = numpy.logical_and(board.type[:,i] == 0, board.status[0,i] == 0)
 					offset = mask[:j+1].sum()
+					if i==1:
+						print(mask, j, offset)
+					j = offset - 1
 					
 					# now we presume that it will end up there.
-					bad_colors = set()
+					bad_colors = set([lastcolor])
 					if i+1<ncols:
 						bad_colors.add(board.color[j,i+1])
 					if i-1>=0:
 						bad_colors.add(board.color[j,i-1])
 					if j+1<nrows:
 						bad_colors.add(board.color[j+1,i])
-					
+					#if i==1:
+					#	print('topfill should avoid colors:', bad_colors)
 					# try twice to avoid these colors
 					color = 1 + random.randint(self.ncolors)
 					if color in bad_colors:
@@ -274,10 +279,12 @@ class NastyTopFiller(object):
 						if color in bad_colors:
 							color = 1 + random.randint(self.ncolors)
 					
+					lastcolor = color
+					#print('setting lastcolor:', lastcolor)
 					board.type[0,i] = 1
 					board.color[0,i] = color
 					board.status[0,i] = 0
-				changed = True
+				changed.append([0,i,'topfilled'])
 		return changed
 
 class BoardGravityPuller(object):
@@ -300,7 +307,7 @@ class BoardGravityPuller(object):
 		board = self.board
 		nrows, ncols = self.board.shape
 		# handle empty cells starting from below:
-		changed = False
+		changed = []
 		for j in list(range(1,nrows))[::-1]:
 			for i in range(ncols):
 				if board.type[j,i] == 0 and board.status[j,i] == 0:
@@ -311,7 +318,7 @@ class BoardGravityPuller(object):
 						continue
 					if board.type[j-1,i] > 0:
 						self.drop(j-1,i,j,i)
-						changed = True
+						changed.append([j,i,'dropped from top'])
 						continue
 					left = random.randint(2) * 2 - 1
 					right = -left
@@ -322,11 +329,11 @@ class BoardGravityPuller(object):
 					# the neighbor is filled (supported)
 					if 0 <= i+left < ncols and board.type[j-1,i+left] > 0 and board.type[j,i+left] > 0:
 						self.drop(j-1,i+left,j,i)
-						changed = True
+						changed.append([j,i,'dropped from top-left' if left == -1 else 'dropped from top-right'])
 						continue
 					elif 0 <= i+right < ncols and board.type[j-1,i+right] > 0 and board.type[j,i+right] > 0:
 						self.drop(j-1,i+right,j,i)
-						changed = True
+						changed.append([j,i,'dropped from top-left' if right == -1 else 'dropped from top-right'])
 						continue
 					#elif 0 <= i+left < ncols and board.type[j-1,i+left] > 0 and 0 <= i+right < ncols and board.type[j-1,i+right] > 0:
 						#print 'not dropping to', j,i,',',board.type[j,i+left],board.type[j,i+right]
@@ -481,7 +488,6 @@ class PairCombiner(object):
 	
 	def run(self, fromj,fromi, toj,toi):
 		# check if stripe+bomb, stripe+stripe, bomb+bomb, 
-		changed = False
 		# both have to be unlocked and filled
 		nrows, ncols = self.board.shape
 		assert self.board.status[fromj,fromi] == 0, self.board.status[fromj,fromi]
@@ -659,7 +665,6 @@ class PairCombiner(object):
 		for (fromj,fromi,toj,toi),score in scores.most_common():
 			yield (fromj,fromi,toj,toi),score
 			yield (toj,toi,fromj,fromi),score
-			#yield toj,toi,fromj,fromi
 	
 	def shuffle(self):
 		mask = numpy.logical_and(self.board.status == 0, self.board.type == 1)
@@ -779,7 +784,6 @@ class Combiner(object):
 		board = self.board
 		nrows, ncols = self.board.shape
 		matches = []
-		changed = False
 		# find longest sequences of gems
 		# within mask, these have to be true:scenario2.out3
 		# type has to be > 0

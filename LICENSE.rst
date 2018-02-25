@@ -19,6 +19,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 Graphics by Osmic, CC-BY 3.0 http://creativecommons.org/licenses/by/3.0/
 https://opengameart.org/content/gem-jewel-diamond-glass
 
+Graphics by rubberduck, CC0 http://creativecommons.org/publicdomain/zero/1.0/
+https://opengameart.org/content/25-special-effects-rendered-with-blender
 
 Sounds by ??
 
