@@ -29,6 +29,8 @@ outfilename="comb${locked}-${base}-${modifier}.png"
 
 if [[ "$locked" == "N" ]]; then
 cmd0="convert gem${base}.png"
+elif [[ "$locked" == "X" ]]; then
+cmd0="convert gem${base}.png gemlock${locked}.png -composite"
 else
 cmd0="convert gemlock${locked}.png gem${base}.png -composite"
 fi
@@ -53,6 +55,8 @@ outfilename="comb${locked}-${base}-${modifier}.png"
 
 if [[ "$locked" == "N" ]]; then
 cmd0="convert gem${modifier}.png"
+elif [[ "$locked" == "X" ]]; then
+cmd0="convert gem${modifier}.png gem${locked}.png -composite"
 else
 cmd0="convert gem${locked}.png gem${modifier}.png -composite"
 fi

@@ -32,6 +32,8 @@ from pygame.locals import QUIT, KEYUP, K_ESCAPE, K_BACKSPACE, MOUSEBUTTONUP, MOU
 from gemengine import Board, InitialFillerDoubleLockSpecial, InitialFillerDoubleLock, InitialFillerDisable, NastyTopFiller, BoardGravityPuller, Combiner, PairCombiner, Activater
 
 FPS = 60 # frames per second to update the screen
+HINTFPS = FPS / 10
+SCOREFPS = FPS / 20
 WINDOWWIDTH = 800  # width of the program's window, in pixels
 WINDOWHEIGHT = 600 # height in pixels
 
@@ -41,6 +43,7 @@ GEMIMAGESIZE = 64 # width & height of each space in pixels
 # gem0.png, gem1.png, etc. up to gem(N-1).png.
 NUMGEMIMAGES = 7
 NUMFIREIMAGES = 30
+NUMGLANCEIMAGES = 29
 
 # NUMMATCHSOUNDS is the number of different sounds to choose from when a match
 # is made. The .wav files are named match0.wav, match1.wav, etc.
@@ -49,6 +52,7 @@ NUMMATCHSOUNDS = 6
 MOVERATE = 5 # 1 to 100, larger num means faster animations
 
 HIGHLIGHTCOLOR = (0, 255, 255) # color of the selected gem's border
+HINTCOLOR = (128, 255, 255) # color to hint to a possible move
 BGCOLOR = (170, 190, 255) # background color on the screen
 #BGCOLOR = (255, 255, 255) # background color on the screen
 GRIDCOLOR = (0, 0, 255) # color of the game board
@@ -66,10 +70,13 @@ LEFT = 4
 EMPTY_SPACE = -1 # an arbitrary, nonnegative value
 ROWABOVEBOARD = 'row above board' # an arbitrary, noninteger value
 
+class GameInvalidException(Exception):
+	pass
+
 class UltraGemGame(object):
-	def __init__(self, ncolors=4):
-		self.score = 0 # global variable for the score
+	def __init__(self, gameid=1, ncolors=6):
 		self.ncolors = ncolors
+		self.gameid = gameid
 
 		self.BOARDWIDTH = 8 # how many columns in the board
 		self.BOARDHEIGHT = 8 # how many rows in the board
@@ -79,15 +86,21 @@ class UltraGemGame(object):
 		self.XMARGIN = int((WINDOWWIDTH - GEMIMAGESIZE * self.BOARDWIDTH) / 2)
 		self.YMARGIN = int((WINDOWHEIGHT - GEMIMAGESIZE * self.BOARDHEIGHT) / 2)
 		self.rng = numpy.random
-		self.rng.seed(1)
+		#self.rng.seed(4)
 
 	def run(self):
 		pygame.init()
 		
+		self.BASICFONT = pygame.font.Font('freesansbold.ttf', 36)
 		self.FPSCLOCK = pygame.time.Clock()
 		self.WINDOWSURF = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
 		pygame.display.set_caption('Gemgem')
-		self.BASICFONT = pygame.font.Font('freesansbold.ttf', 36)
+		self.WINDOWSURF.fill(BGCOLOR)
+		txt = self.BASICFONT.render('Loading ...', 1, GAMEOVERCOLOR, GAMEOVERBGCOLOR)
+		rect = txt.get_rect()
+		rect.center = int(WINDOWWIDTH / 2), int(WINDOWHEIGHT / 2)
+		self.WINDOWSURF.blit(txt, rect)
+		pygame.display.update()
 
 		# Load the images
 		self.GEMIMAGES = {}
@@ -95,7 +108,7 @@ class UltraGemGame(object):
 			for modifier, type in ('N',1), ('stripeH',2), ('stripeV',3), ('bomb',4):
 				for color in range(NUMGEMIMAGES):
 					i = color + 1
-					print('loading comb%s-%s-%s.png for %d,%d,%d' % (lock, i, modifier, status, type, color))
+					#print('loading comb%s-%s-%s.png for %d,%d,%d' % (lock, i, modifier, status, type, color))
 					gemImage = pygame.image.load('comb%s-%s-%s.png' % (lock, i, modifier))
 					if gemImage.get_size() != (GEMIMAGESIZE, GEMIMAGESIZE):
 						gemImage = pygame.transform.smoothscale(gemImage, (GEMIMAGESIZE, GEMIMAGESIZE))
@@ -107,15 +120,28 @@ class UltraGemGame(object):
 			if gemImage.get_size() != (GEMIMAGESIZE, GEMIMAGESIZE):
 				gemImage = pygame.transform.smoothscale(gemImage, (GEMIMAGESIZE, GEMIMAGESIZE))
 			self.GEMIMAGES[(status, type, 0)] = gemImage
+			
+			if status > 0:
+				modifier, type = 'empty', 0
+				gemImage = pygame.image.load('gemlock%s.png' % (lock))
+				if gemImage.get_size() != (GEMIMAGESIZE, GEMIMAGESIZE):
+					gemImage = pygame.transform.smoothscale(gemImage, (GEMIMAGESIZE, GEMIMAGESIZE))
+				self.GEMIMAGES[(status, type, 0)] = gemImage
+
 		#print('images loaded:', self.GEMIMAGES.keys())
 
-		FIREIMAGES = []
+		self.FIREIMAGES = []
 		for i in range(1,NUMFIREIMAGES+1):
 			gemImage = pygame.image.load('fire%s.png' % i)
 			if gemImage.get_size() != (GEMIMAGESIZE, GEMIMAGESIZE):
 				gemImage = pygame.transform.smoothscale(gemImage, (GEMIMAGESIZE, GEMIMAGESIZE))
-			FIREIMAGES.append(gemImage)
-		self.FIREIMAGES = FIREIMAGES
+			self.FIREIMAGES.append(gemImage)
+		self.GLANCEIMAGES = []
+		for i in range(1,NUMGLANCEIMAGES+1):
+			gemImage = pygame.image.load('glance%s.png' % i)
+			if gemImage.get_size() != (GEMIMAGESIZE, GEMIMAGESIZE):
+				gemImage = pygame.transform.smoothscale(gemImage, (GEMIMAGESIZE, GEMIMAGESIZE))
+			self.GLANCEIMAGES.append(gemImage)
 
 		# Load the sounds.
 		GAMESOUNDS = {}
@@ -137,16 +163,21 @@ class UltraGemGame(object):
 		self.BOARDRECTS = BOARDRECTS
 
 		while True:
-			self.runGame()
-			self.score = 0
+			try:
+				self.last_move = None, None, None, None
+				self.score = self.scoring_function([])
+				self.events_processed = 0
+				self.initGame()
+				self.runGame()
+			except GameInvalidException as e:
+				print(e)
+				
+			self.gameid += 1
 	
-	def initGame(self):
+	def setupGame(self, seed):
 		nrows, ncols, ncolors = self.BOARDWIDTH, self.BOARDHEIGHT, self.ncolors
+		rng = numpy.random.RandomState(seed)
 		board = Board(nrows=nrows, ncols=ncols)
-		
-		rng = self.rng
-		
-		"""
 		# make lower numbers more likely to be selected
 		prows = 1. / (0.2 + numpy.arange(nrows))
 		prows /= prows.sum()
@@ -156,7 +187,6 @@ class UltraGemGame(object):
 		pcols /= pcols.sum()
 		ndcols = rng.choice(numpy.arange(nrows), p=pcols)
 		ndlcols = rng.choice(numpy.arange(nrows), p=pcols)
-		
 		if rng.uniform() < 0.1:
 			types = [2,3,4,5] if rng.uniform() < 0.5 else [2,3,4]
 			InitialFillerDoubleLockSpecial(board, ncolors=ncolors, types=types, nrows=ndlrows, ncols=ndlcols, rng=rng).run()
@@ -164,9 +194,24 @@ class UltraGemGame(object):
 			InitialFillerDoubleLock(board, nrows=ndlrows, ncols=ndlcols, rng=rng).run()
 		if rng.uniform() < 0.1:
 			InitialFillerDisable(board, nrows=ndrows, ncols=ndcols, rng=rng).run()
-		"""
+		topfill = NastyTopFiller(board, ncolors=ncolors)
+		return board, topfill
+
+	def setupUniqueGame(self, seed):
+		nrows, ncols, ncolors = self.BOARDWIDTH, self.BOARDHEIGHT, self.ncolors
+		board, topfill = self.setupGame(seed)
+		for i in range(1, seed):
+			board2, _ = self.setupGame(i)
+			if (board2.status == board.status).all() and (board2.type == board.type).all() and (board2.color == board.color).all():
+				raise GameInvalidException("Board with seed=%d same as seed=%d" % (i, seed))
+		return board, topfill
+
+	def initGame(self):
+		board, topfill = self.setupUniqueGame(self.gameid)
+		
+		rng = self.rng
 		self.board = board
-		self.topfill = NastyTopFiller(board, ncolors=ncolors)
+		self.topfill = topfill
 		self.grav = BoardGravityPuller(board)
 		self.comb = Combiner(board)
 		self.paircomb = PairCombiner(board)
@@ -175,6 +220,7 @@ class UltraGemGame(object):
 	def fillBoardAndAnimate(self, board, points=None):
 		# dropping phase
 		anychange = True
+		nshuffles = 0
 		print(self.board)
 		while True:
 			while anychange:
@@ -247,23 +293,25 @@ class UltraGemGame(object):
 			if len(moves) == 0:
 				# no moves left -- shuffle
 				print(('shuffling ...'))
+				nshuffles += 1
+				if nshuffles > 20:
+					raise GameInvalidException('Too many shuffles')
 				boardCopy = copy.deepcopy(board)
 				self.paircomb.shuffle()
 				self.updateBoard(board)
-				self.transitionBoard(boardCopy, board)
+				self.transitionBoard(boardCopy, board, type='glance')
 				print(board)
 				continue
+			self.rng.shuffle(moves)
 			return moves
 	
 	def continueGame(self, board, move):
 		boardCopy = copy.deepcopy(board)
-		print('paircomb-1', board)
 		self.paircomb.run(*move)
 		self.updateBoard(board)
-		print('paircomb-2', board)
-		print(self.board)
 		self.transitionBoard(boardCopy, board)
 		self.comb.set_last_interaction(*move)
+		self.last_move = move
 		print(self.board)
 
 		# combining phase
@@ -272,9 +320,7 @@ class UltraGemGame(object):
 			# have to find the differences and transition
 			# using fire
 			boardCopy = copy.deepcopy(board)
-			print('comb-1', board)
 			self.updateBoard(board)
-			print('comb-2', board)
 			print(self.board)
 			self.transitionBoard(boardCopy, board)
 		
@@ -282,9 +328,7 @@ class UltraGemGame(object):
 		anychange = self.acto.run() or anychange
 		if anychange:
 			boardCopy = copy.deepcopy(board)
-			print('acto-1', board)
 			self.updateBoard(board)
-			print('acto-2', board)
 			print(self.board)
 			self.transitionBoard(boardCopy, board)
 		
@@ -295,7 +339,7 @@ class UltraGemGame(object):
 		for (fromj,fromi,toj,toi),score in self.possible_moves:
 			if x1 == fromi and y1 == fromj and x2 == toi and y2 == toj:
 				return (fromj,fromi,toj,toi)
-		print('moves:')
+		print('possible moves:')
 		for move, score in self.possible_moves:
 			print(move)
 		print()
@@ -308,7 +352,8 @@ class UltraGemGame(object):
 
 		# Remove some of the gems from this board data structure copy.
 		for gem in gems:
-			if gem['y'] != ROWABOVEBOARD:
+			if gem['y'] != ROWABOVEBOARD and gem['y'] >= 0:
+				#print('temporarily disabling', gem['x'], gem['y'])
 				boardCopy[gem['x']][gem['y']] = EMPTY_SPACE
 		return boardCopy
 	
@@ -317,13 +362,11 @@ class UltraGemGame(object):
 		type = self.board.type[j,i]
 		status = self.board.status[j,i]
 		
-		if type == 0:
+		if type == 0 and status == 0:
 			return EMPTY_SPACE
 		else:
 			if type == 5:
 				color = 0
-		if type > 1:
-			print((status, type, color))
 		return (status, type, color)
 	
 	def updateBoard(self, board):
@@ -344,17 +387,21 @@ class UltraGemGame(object):
 			else:
 				board[gem['x']][0] = gem['imageNum'] # ignore 'direction', just move to top row
 
-	def transitionBoard(self, oldboard, newboard):
+	def transitionBoard(self, oldboard, newboard, type='fire'):
 		progress = 0 # progress at 0 represents beginning, progress at 100 represents finish.
 		differences = []
 		for x in range(self.BOARDWIDTH):
 			for y in range(self.BOARDHEIGHT):
 				if oldboard[x][y] != newboard[x][y]:
 					differences.append((x,y))
-		print('differences:', differences)
+		#print('differences:', differences)
 		if not differences: return
-		while progress < NUMFIREIMAGES:
-			print('transitioning...', progress)
+		if type == 'fire':
+			NIMG = NUMFIREIMAGES
+		elif type == 'glance':
+			NIMG = NUMGLANCEIMAGES
+		while progress < NIMG:
+			#print('transitioning...', progress)
 			self.WINDOWSURF.fill(BGCOLOR)
 			if progress < 22:
 				self.drawBoard(oldboard)
@@ -362,21 +409,26 @@ class UltraGemGame(object):
 				self.drawBoard(newboard)
 			# Draw fire where they differ.
 			for x,y in differences:
-				self.drawFire(x, y, progress)
-			self.drawScore()
+				self.drawFire(x, y, progress, type=type)
+			self.drawScore(update=False)
 			pygame.display.update()
 			self.FPSCLOCK.tick(FPS)
 			progress += 1
 		
 		self.drawBoard(newboard)
-		self.drawScore()
+		self.drawScore(update=True)
 		pygame.display.update()
 	
-	def drawFire(self, x, y, progress):
+	def drawFire(self, x, y, progress, type):
 		pixelx = self.XMARGIN + (x * GEMIMAGESIZE)
 		pixely = self.YMARGIN + (y * GEMIMAGESIZE)
 		r = pygame.Rect( (pixelx, pixely, GEMIMAGESIZE, GEMIMAGESIZE) )
-		self.WINDOWSURF.blit(self.FIREIMAGES[progress], r)
+		if type == 'fire':
+			self.WINDOWSURF.blit(self.FIREIMAGES[progress], r)
+		elif type == 'glance':
+			self.WINDOWSURF.blit(self.GLANCEIMAGES[progress], r)
+		else:
+			assert False, type
 	
 	def animateMovingGems(self, board, gems, pointsText):
 		progress = 0 # progress at 0 represents beginning, progress at 100 represents finish.
@@ -386,13 +438,7 @@ class UltraGemGame(object):
 			# Draw each gem.
 			for gem in gems:
 				self.drawMovingGem(gem, progress)
-			self.drawScore()
-			for pointText in pointsText:
-				pointsSurf = self.BASICFONT.render(str(pointText['points']), 1, SCORECOLOR)
-				pointsRect = pointsSurf.get_rect()
-				pointsRect.center = (pointText['x'], pointText['y'])
-				self.WINDOWSURF.blit(pointsSurf, pointsRect)
-
+			self.drawScore(update=False)
 			pygame.display.update()
 			self.FPSCLOCK.tick(FPS)
 			progress += MOVERATE
@@ -430,8 +476,54 @@ class UltraGemGame(object):
 				if gemToDraw != EMPTY_SPACE:
 					self.WINDOWSURF.blit(self.GEMIMAGES[gemToDraw], self.BOARDRECTS[x][y])
 	
-	def drawScore(self):
-		pass
+	def scoring_function(self, events):
+		nspecial = [0, 0, 0]
+		ncombispecial_index = {22:0,42:1,44:2,51:3,52:4,54:5,55:6}
+		ncombispecial = [0, 0, 0, 0, 0, 0, 0]
+		nunlocked = 0
+		ndestroyed = 0
+		score = 0
+		for type, value in events:
+			if type == 'activated':
+				if value in (2,3):
+					nspecial[0] += 1
+				elif value == 4:
+					nspecial[1] += 1
+				elif value == 5:
+					nspecial[2] += 1
+				score += 10 * value
+			elif type == 'unlocked':
+				nunlocked += value
+			elif type == 'destroyed':
+				ndestroyed += value
+				score += value
+			elif type == 'combined':
+				ncombispecial[ncombispecial_index[value]] += 1
+		return [score, ndestroyed, nunlocked] + nspecial + ncombispecial
+
+	def drawScore(self, update=True):
+		lastscore = self.score
+		if update:
+			newevents = self.board.events[self.events_processed:]
+			newscore = self.scoring_function(newevents)
+			self.score = [a+b for a,b in zip(newscore, lastscore)]
+			_, _, y, x = self.last_move
+			#print('new score:', newscore, x, y)
+			if newscore[0] > 0 and x is not None:
+				pointsSurf = self.BASICFONT.render(str(newscore[0]), 1, SCORECOLOR)
+				pointsRect = pointsSurf.get_rect()
+				pointsRect.center = (x * GEMIMAGESIZE + self.XMARGIN, y * GEMIMAGESIZE + self.YMARGIN)
+				self.WINDOWSURF.blit(pointsSurf, pointsRect)
+				pygame.display.update()
+				self.FPSCLOCK.tick(SCOREFPS)
+			self.events_processed = len(self.board.events)
+		
+		scoretxt = '%d' % (self.score[0] * 100)
+		scoreImg = self.BASICFONT.render(scoretxt, 1, SCORECOLOR) # score is a global variable
+		scoreRect = scoreImg.get_rect()
+		scoreRect.bottomleft = (10, WINDOWHEIGHT - 10)
+
+		self.WINDOWSURF.blit(scoreImg, scoreRect)
 
 	def checkForGemClick(self, pos):
 		# See if the mouse click was on the board
@@ -443,6 +535,22 @@ class UltraGemGame(object):
 	
 	def highlightSpace(self, x, y):
 		pygame.draw.rect(self.WINDOWSURF, HIGHLIGHTCOLOR, self.BOARDRECTS[x][y], 4)
+
+	def hintMove(self):
+		(fromj, fromi, toj, toi), score = self.possible_moves[0]
+		for i in range(3):
+			x, y = fromi, fromj
+			pygame.draw.rect(self.WINDOWSURF, HINTCOLOR, self.BOARDRECTS[x][y], 4)
+			x, y = toi, toj
+			pygame.draw.rect(self.WINDOWSURF, HINTCOLOR, self.BOARDRECTS[x][y], 4)
+			pygame.display.update()
+			self.FPSCLOCK.tick(HINTFPS)
+			x, y = fromi, fromj
+			pygame.draw.rect(self.WINDOWSURF, GRIDCOLOR, self.BOARDRECTS[x][y], 4)
+			x, y = toi, toj
+			pygame.draw.rect(self.WINDOWSURF, GRIDCOLOR, self.BOARDRECTS[x][y], 4)
+			pygame.display.update()
+			self.FPSCLOCK.tick(HINTFPS)
 
 	def getSwappingGems(self, board, firstXY, secondXY):
 		firstGem = dict(imageNum=board[firstXY[0]][firstXY[1]],
@@ -470,8 +578,6 @@ class UltraGemGame(object):
 		return firstGem, secondGem
 	
 	def runGame(self):
-		self.initGame()
-
 		mainBoard = [[EMPTY_SPACE] * self.BOARDHEIGHT for x in range(self.BOARDWIDTH)]
 		# Drop the initial gems.
 		self.possible_moves = self.fillBoardAndAnimate(mainBoard, [])
@@ -546,6 +652,7 @@ class UltraGemGame(object):
 					self.animateMovingGems(boardCopy, [firstSwappingGem, secondSwappingGem], [])
 					mainBoard[firstSwappingGem['x']][firstSwappingGem['y']] = secondSwappingGem['imageNum']
 					mainBoard[secondSwappingGem['x']][secondSwappingGem['y']] = firstSwappingGem['imageNum']
+					self.hintMove()
 				else:
 					# successful move. 
 					# reset selection
@@ -555,7 +662,7 @@ class UltraGemGame(object):
 					self.possible_moves = self.continueGame(mainBoard, move)
 					
 					
-					if nswaps > 40:
+					if nswaps > 20:
 						isGameOver = True
 
 			# Draw the board.
@@ -565,15 +672,15 @@ class UltraGemGame(object):
 				self.highlightSpace(firstSelectedGem[0], firstSelectedGem[1])
 			if isGameOver:
 				if clickContinueTextSurf == None:
-					clickContinueTextSurf = self.BASICFONT.render('Final Score: %s (Click to continue)' % (self.score), 1, GAMEOVERCOLOR, GAMEOVERBGCOLOR)
+					clickContinueTextSurf = self.BASICFONT.render('Final Score: %s (Click to continue)' % (self.score[0]), 1, GAMEOVERCOLOR, GAMEOVERBGCOLOR)
 					clickContinueTextRect = clickContinueTextSurf.get_rect()
 					clickContinueTextRect.center = int(WINDOWWIDTH / 2), int(WINDOWHEIGHT / 2)
 				self.WINDOWSURF.blit(clickContinueTextSurf, clickContinueTextRect)
-			self.drawScore()
+			self.drawScore(update=True)
 			pygame.display.update()
 			self.FPSCLOCK.tick(FPS)
 
 
 if __name__ == '__main__':
-	game = UltraGemGame()
+	game = UltraGemGame(1)
 	game.run()

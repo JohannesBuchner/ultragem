@@ -63,22 +63,31 @@ scenario = list(map(int,sys.argv[1:]))
 board, topfill = create_scenario_unique(*scenario)
 print('ANALYSING SCENARIO:', ' '.join(['%d' % i for i in scenario]))
 print(board)
+prefix = 'gamestats/%s' % '_'.join(['%d' % i for i in scenario])
 
-with open('gamestats/%s-board.txt' % '_'.join(['%d' % i for i in scenario]), 'w') as f:
+if not os.path.exists(prefix):
+	os.mkdir(prefix)
+
+with open('%s/board.txt' % prefix, 'w') as f:
 	f.write(str(board))
 
-maxswaps = 40
+Nscores = 13
+maxswaps = 41
 Nruns = 40
+maxswaps = 11
+Nruns = 10
 verbose = False
 
 output = []
-outfilename = 'gamestats/%s.txt' % '_'.join(['%d' % i for i in scenario])
-
-if os.path.exists(outfilename):
-	print('Already analysed.')
-	sys.exit(0)
 
 for move_selector, selector_name in zip([worst_move_selector, random_move_selector, best_move_selector, smart_move_selector], ['worst', 'random', 'best', 'smart']):
+
+	outfilename = '%s/%s.txt' % (prefix, selector_name)
+
+	if os.path.exists(outfilename):
+		print('Already analysed.')
+		continue
+
 	scores = []
 	for run in range(Nruns):
 		sys.stderr.write('Game %d/%d with strategy "%s" ...   \r' % (run+1,Nruns, selector_name))
@@ -89,6 +98,7 @@ for move_selector, selector_name in zip([worst_move_selector, random_move_select
 		paircomb = PairCombiner(board)
 		acto = Activater(board)
 		
+		stepscores = []
 		nstep = 0
 		ncomb = 0
 		nswaps = 0
@@ -127,18 +137,9 @@ for move_selector, selector_name in zip([worst_move_selector, random_move_select
 				if verbose: print('moves used up.')
 				break
 			if ncomb > (nswaps + 1) * 40:
-				if selector_name in ['random', 'worst']:
-					raise Exception('STOPPING UNPLAYABLE GAME (many shuffles)')
-				else:
-					print('STOPPING TRIVIAL GAME')
-					break
+				raise Exception('STOPPING TRIVIAL GAME')
 			if nshuffles > 100:
-				if selector_name != 'random':
-					print('STOPPING UNPLAYABLE GAME (many shuffles)')
-					break
-				else:
-					raise Exception('STOPPING UNPLAYABLE GAME (many shuffles)')
-					break
+				raise Exception('STOPPING UNPLAYABLE GAME (many shuffles)')
 			# ok, the board settled down now
 			# we should ask the agent/user what they want to do now
 			nstep += 1
@@ -157,6 +158,7 @@ for move_selector, selector_name in zip([worst_move_selector, random_move_select
 			
 			# move selector
 			move = move_selector(board, moves)
+			stepscores.append(scoring_function(board.events))
 			
 			nstep += 1
 			if verbose: print(('STEP %d: swapping ...' % nstep))
@@ -179,15 +181,24 @@ for move_selector, selector_name in zip([worst_move_selector, random_move_select
 				nstep += 1
 				if verbose: print(board)
 				continue
-		scores.append(scoring_function(board.events))
+		scores.append(stepscores)
 	
 	sys.stderr.write('\n')
 	scores = numpy.array(scores)
+	assert scores.shape == (Nruns, maxswaps, Nscores)
+	print(scores.shape)
 	print(selector_name)
-	q = scipy.stats.mstats.mquantiles(scores, [0.5, 0.95], axis=0).astype(int)
-	print(q)
-	output.append(q.flatten())
+	q = scipy.stats.mstats.mquantiles(scores.reshape((Nruns, Nscores*maxswaps)), [0.5, 0.95], axis=0).astype(int).reshape((2, Nscores, maxswaps))
 
-numpy.savetxt(outfilename, output, header='scores for worst/random/best/smart move selector strategies. scores are 50% and 95% quantiles (based on 40 games) of: game score, #destroyed, #unlocked, #stripes, #bombs, #zappers', fmt='%d')
+	outf = open(outfilename, 'wb')
+	outf.write(b'''# scores for worst/random/best/smart move selector strategies. 
+# scores are 50% and 95% quantiles (based on 40 games) of: 
+# game score, #destroyed, #unlocked, #stripes, #bombs, #zappers
+''')
+	numpy.savetxt(outf, numpy.reshape(q, (2*Nscores, maxswaps)), fmt='%d')
+	outf.close()
 
+	lastscores = scores[:,-1,:]
+	qq = scipy.stats.mstats.mquantiles(lastscores, [0.5, 0.95], axis=0).astype(int)
+	print(qq)
 

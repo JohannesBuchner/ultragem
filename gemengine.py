@@ -258,8 +258,6 @@ class NastyTopFiller(object):
 					# count the number of empty ones until there
 					mask = numpy.logical_and(board.type[:,i] == 0, board.status[0,i] == 0)
 					offset = mask[:j+1].sum()
-					if i==1:
-						print(mask, j, offset)
 					j = offset - 1
 					
 					# now we presume that it will end up there.
@@ -632,7 +630,7 @@ class PairCombiner(object):
 			# check if above/below to(bottom) are 2 of from-color
 			if bottomj+2 < nrows and (board.color[bottomj+1:bottomj+2+1,i] == topcolor).all():
 				yield (topj,i,bottomj,i,1)
-			if topj >= 2 and (board.color[topj-2:topj] == bottomcolor).all():
+			if topj >= 2 and (board.color[topj-2:topj,i] == bottomcolor).all():
 				yield (topj,i,bottomj,i,1)
 			# no vertical match. Lets find a horizontal match
 			# horizontal matches can happen if it completes a column
