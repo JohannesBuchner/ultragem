@@ -109,21 +109,21 @@ class UltraGemGame(object):
 				for color in range(NUMGEMIMAGES):
 					i = color + 1
 					#print('loading comb%s-%s-%s.png for %d,%d,%d' % (lock, i, modifier, status, type, color))
-					gemImage = pygame.image.load('comb%s-%s-%s.png' % (lock, i, modifier))
+					gemImage = pygame.image.load('graphics/comb%s-%s-%s.png' % (lock, i, modifier))
 					if gemImage.get_size() != (GEMIMAGESIZE, GEMIMAGESIZE):
 						gemImage = pygame.transform.smoothscale(gemImage, (GEMIMAGESIZE, GEMIMAGESIZE))
 					self.GEMIMAGES[(status, type, color)] = gemImage
 			
 			modifier, type = 'spark', 5
 			i = 'N'
-			gemImage = pygame.image.load('comb%s-%s-%s.png' % (lock, i, modifier))
+			gemImage = pygame.image.load('graphics/comb%s-%s-%s.png' % (lock, i, modifier))
 			if gemImage.get_size() != (GEMIMAGESIZE, GEMIMAGESIZE):
 				gemImage = pygame.transform.smoothscale(gemImage, (GEMIMAGESIZE, GEMIMAGESIZE))
 			self.GEMIMAGES[(status, type, 0)] = gemImage
 			
 			if status > 0:
 				modifier, type = 'empty', 0
-				gemImage = pygame.image.load('gemlock%s.png' % (lock))
+				gemImage = pygame.image.load('graphics/gemlock%s.png' % (lock))
 				if gemImage.get_size() != (GEMIMAGESIZE, GEMIMAGESIZE):
 					gemImage = pygame.transform.smoothscale(gemImage, (GEMIMAGESIZE, GEMIMAGESIZE))
 				self.GEMIMAGES[(status, type, 0)] = gemImage
@@ -132,23 +132,23 @@ class UltraGemGame(object):
 
 		self.FIREIMAGES = []
 		for i in range(1,NUMFIREIMAGES+1):
-			gemImage = pygame.image.load('fire%s.png' % i)
+			gemImage = pygame.image.load('graphics/fire%s.png' % i)
 			if gemImage.get_size() != (GEMIMAGESIZE, GEMIMAGESIZE):
 				gemImage = pygame.transform.smoothscale(gemImage, (GEMIMAGESIZE, GEMIMAGESIZE))
 			self.FIREIMAGES.append(gemImage)
 		self.GLANCEIMAGES = []
 		for i in range(1,NUMGLANCEIMAGES+1):
-			gemImage = pygame.image.load('glance%s.png' % i)
+			gemImage = pygame.image.load('graphics/glance%s.png' % i)
 			if gemImage.get_size() != (GEMIMAGESIZE, GEMIMAGESIZE):
 				gemImage = pygame.transform.smoothscale(gemImage, (GEMIMAGESIZE, GEMIMAGESIZE))
 			self.GLANCEIMAGES.append(gemImage)
 
 		# Load the sounds.
 		GAMESOUNDS = {}
-		GAMESOUNDS['bad swap'] = pygame.mixer.Sound('badswap.wav')
+		GAMESOUNDS['bad swap'] = pygame.mixer.Sound('sounds/badswap.wav')
 		GAMESOUNDS['match'] = []
 		for i in range(NUMMATCHSOUNDS):
-			GAMESOUNDS['match'].append(pygame.mixer.Sound('match%s.wav' % i))
+			GAMESOUNDS['match'].append(pygame.mixer.Sound('sounds/match%s.wav' % i))
 		self.GAMESOUNDS = GAMESOUNDS
 
 		BOARDRECTS = []
@@ -300,7 +300,6 @@ class UltraGemGame(object):
 				self.paircomb.shuffle()
 				self.updateBoard(board)
 				self.transitionBoard(boardCopy, board, type='glance')
-				print(board)
 				continue
 			self.rng.shuffle(moves)
 			return moves
