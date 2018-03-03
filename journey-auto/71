@@ -1,0 +1,15 @@
+NCOLORS: 4
+MAXSWAPS: 20
+GOALNAME: nzapper
+GOALID: 5
+NMIN: 3
+DIFFICULTY: 0.30
+BOARD: 8x8
+ BL          BL  BL          BL 
+                                
+ BL          BL  BL          BL 
+                                
+ BL          BL  BL          BL 
+                                
+ BL          BL  BL          BL 
+                                

@@ -1,0 +1,15 @@
+NCOLORS: 5
+MAXSWAPS: 10
+GOALNAME: nunlocked
+GOALID: 2
+NMIN: 7
+DIFFICULTY: 0.85
+BOARD: 8x8
+                                
+                                
+                                
+                                
+                                
+|0L |4L =3L |3L X0L |0L X2L =4L 
+                                
+                                
