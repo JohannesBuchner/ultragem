@@ -74,8 +74,6 @@ with open('%s/board.txt' % prefix, 'w') as f:
 Nscores = 13
 maxswaps = 41
 Nruns = 40
-maxswaps = 11
-Nruns = 10
 verbose = False
 
 output = []
@@ -188,14 +186,16 @@ for move_selector, selector_name in zip([worst_move_selector, random_move_select
 	assert scores.shape == (Nruns, maxswaps, Nscores)
 	print(scores.shape)
 	print(selector_name)
-	q = scipy.stats.mstats.mquantiles(scores.reshape((Nruns, Nscores*maxswaps)), [0.5, 0.95], axis=0).astype(int).reshape((2, Nscores, maxswaps))
+	q = scipy.stats.mstats.mquantiles(scores.reshape((Nruns, Nscores*maxswaps)), [0.5, 0.95], axis=0).astype(int).reshape((2, maxswaps, Nscores))
+	
+	qflat = numpy.rollaxis(q, 1).reshape((maxswaps, 2*Nscores))
 
 	outf = open(outfilename, 'wb')
 	outf.write(b'''# scores for worst/random/best/smart move selector strategies. 
 # scores are 50% and 95% quantiles (based on 40 games) of: 
 # game score, #destroyed, #unlocked, #stripes, #bombs, #zappers
 ''')
-	numpy.savetxt(outf, numpy.reshape(q, (2*Nscores, maxswaps)), fmt='%d')
+	numpy.savetxt(outf, qflat, fmt='%d')
 	outf.close()
 
 	lastscores = scores[:,-1,:]
