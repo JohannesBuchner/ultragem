@@ -1,7 +1,7 @@
 UltraGem - A Bejeweled/CandyCrush clone
 ======================================
 
-    .. image:: https://raw.githubusercontent.com/JohannesBuchner/gemgem/master/screenshot.png
+    .. image:: https://raw.githubusercontent.com/JohannesBuchner/ultragem/master/screenshot.png
         :alt: UltraGem screenshot
         :align: center
 
