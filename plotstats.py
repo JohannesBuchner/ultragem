@@ -5,7 +5,7 @@ import sys
 numpy.random.seed(1)
 scores = ['score', 'ndestroyed', 'nunlocked', 
 	'nstripe', 'nbomb', 'nzapper', 22,42,44,51,52,54,55]
-scores_preferences = [['nunlocked', 22,42,44,51,52,54,55], ['nstripe', 'nbomb', 'nzapper'], ['score']]
+scores_preferences = [['nunlocked', 22,42,44,52,54,55], ['nstripe', 'nbomb', 'nzapper'], ['score']]
 
 # row in file
 #iworst, irandom, ibest, ismart = 0,1,2,3
