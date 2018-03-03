@@ -100,7 +100,7 @@ class UltraGemGame(object):
 		self.SMALLFONT = pygame.font.Font('freesansbold.ttf', 12)
 		self.FPSCLOCK = pygame.time.Clock()
 		self.WINDOWSURF = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
-		pygame.display.set_caption('Gemgem')
+		pygame.display.set_caption('UltraGem')
 		self.WINDOWSURF.fill(BGCOLOR)
 		txt = self.BASICFONT.render('Loading ...', 1, GAMEOVERCOLOR, GAMEOVERBGCOLOR)
 		rect = txt.get_rect()
@@ -763,7 +763,7 @@ My issue/suggestion/question/ is ...
 
 """ % (str(self.board), self.ncolors, self.maxswaps, self.goalvalue, self.goalid)
 				title = 'Level %d' % self.gameid
-				webbrowser.open("https://github.com/JohannesBuchner/gemgem/issues/new?%s" % (urllib.parse.urlencode(dict(body=body, title=title))))
+				webbrowser.open("https://github.com/JohannesBuchner/ultragem/issues/new?%s" % (urllib.parse.urlencode(dict(body=body, title=title))))
 			#except Exception:
 			#	pass
 	
