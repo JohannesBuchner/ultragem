@@ -1,20 +1,17 @@
-GemGem - A Bejeweled/CandyCrush clone
+UltraGem - A Bejeweled/CandyCrush clone
 ======================================
 
-Original description:
-http://inventwithpython.com/blog/2011/06/24/new-game-source-code-gemgem-a-bejeweled-clone/
-
     .. image:: https://raw.githubusercontent.com/JohannesBuchner/gemgem/master/screenshot.png
-        :alt: GemGem screenshot
+        :alt: UltraGem screenshot
         :width: 100%
         :align: center
 
-Run
---------
+How to Run UltraGem
+--------------------
 
-You need pygame installed. Then simply run::
+You need pygame and a few other libraries installed. Then simply run::
 
-	$ python gemgem.py
+	$ python ultragem.py
 
 
 Progress and TODO
@@ -39,21 +36,23 @@ Progress and TODO
       * If strategy 3 succeeds >=1/50 games -> super hard game.
       * If strategy 3 succeeds <1/50 games -> impossible game
       * Drop trivial and impossible games.
-* Define game score: (done)
+* Define game score: (all done)
    * Reach score X with at most N moves
    * Destroy at least N gems of color X
    * Destroy Ni special gems
    * Bring 4 passive gems (rocks) to the bottom
    * Activate N pre-selected fields (have two explosions there)
-* Define a level specification
+* Define a level specification (done)
    * Level file: initial board size,state,number of colors and required goal
    * Journey: directory of levels, named in sequence
-   * Convert auto-generated and scored levels to levels
-     * Define goals based on bot performance
-   * Load/select journey on startup. Show current level number
-   * If goal reached, player can advance to next level
+* Convert auto-generated and scored levels to levels (done)
+   * Define goals based on bot performance
+* Load/select journey on startup. Show current level number (done)
+* If goal reached, player can advance to next level (done)
 
 
 Open source (see LICENSE.rst)
 
+Based on GemGem:
+http://inventwithpython.com/blog/2011/06/24/new-game-source-code-gemgem-a-bejeweled-clone/
 

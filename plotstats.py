@@ -48,7 +48,7 @@ for filename in sys.argv[1:]:
 				used = True
 				ngoal = goal[idxmin]
 				difficulty_estimate = random[idxmin,1,goalid] * 1. / smart[idxmin,0,goalid]
-				game_sequence.append((board, ncolors, idxmin, goalid, ngoal, difficulty_estimate))
+				game_sequence.append((int(difficulty_estimate*20)/20., board, ncolors, idxmin, goalid, ngoal))
 				break
 			
 	
@@ -74,11 +74,12 @@ plt.colorbar()
 plt.savefig('stats.pdf', bbox_inches='tight')
 plt.close()
 
-import random
-random.seed(1)
-random.shuffle(game_sequence)
+#import random
+#random.seed(1)
+#random.shuffle(game_sequence)
+game_sequence.sort()
 
-for i, (board, ncolors, nswaps, goalid, ngoal, difficulty) in enumerate(game_sequence):
+for i, (difficulty, board, ncolors, nswaps, goalid, ngoal) in enumerate(game_sequence):
 	with open('journey-auto/%d' % (i+1), 'w') as f:
 		f.write('NCOLORS: %d\n' % ncolors)
 		f.write('MAXSWAPS: %d\n' % nswaps)
