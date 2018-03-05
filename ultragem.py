@@ -16,10 +16,14 @@
 #   'x' and 'y' - The location of the gem on the board. 0,0 is the top left.
 #                 There is also a ROWABOVEBOARD row that 'y' can be set to,
 #                 to indicate that it is above the board.
-#   'direction' - one of the four constant variables UP, DOWN, LEFT, RIGHT.
-#                 This is the direction the gem is moving. (Not always used.)
+#   'directionx' 'directiony' - direction the gem is moving. (Not always used.)
 #   'imageNum' - The integer index into GEMIMAGES to denote which image this
 #                gem uses.
+
+# the game information is the board, which contains the content for each cell.
+# the board used by UltraGemGame contains a reference to the image index
+# the board used internally (self.board) is described in gemengine and is 
+# translated into the image-board.
 
 
 import random
@@ -181,6 +185,7 @@ class UltraGemGame(object):
 			try:
 				self.last_move = None, None, None, None
 				self.nswaps = 0
+				self.boardlog = []
 				self.score = self.scoring_function([])
 				self.events_processed = 0
 				self.initGame()
@@ -325,6 +330,7 @@ class UltraGemGame(object):
 		# dropping phase
 		anychange = True
 		nshuffles = 0
+		self.gameLog('fillBoardAndAnimate', self.board.copy())
 		print(self.board)
 		while True:
 			while anychange:
@@ -332,6 +338,7 @@ class UltraGemGame(object):
 				anychange = len(changes) > 0
 				movingGems = []
 				#print('grav changes:', changes, anychange)
+				self.gameLog('grav', self.board.copy())
 				print(self.board)
 				for j, i, move in changes:
 					if move == 'dropped from top':
@@ -353,6 +360,7 @@ class UltraGemGame(object):
 				changes = self.topfill.run()
 				anychange = len(changes) > 0 or anychange
 				#print('topfill changes:', changes, anychange)
+				self.gameLog('topfill', self.board.copy())
 				print(self.board)
 				for j, i, move in changes:
 					directionx = 0
@@ -373,6 +381,7 @@ class UltraGemGame(object):
 			
 			# combining phase
 			anychange = self.comb.run()
+			self.gameLog('comb', self.board.copy())
 			if anychange:
 				# have to find the differences and transition
 				# using fire
@@ -383,6 +392,7 @@ class UltraGemGame(object):
 			
 			#print(('STEP %d: activation...' % nstep))
 			anychange = self.acto.run() or anychange
+			self.gameLog('acto', self.board.copy())
 			if anychange:
 				boardCopy = copy.deepcopy(board)
 				self.updateBoard(board)
@@ -396,21 +406,24 @@ class UltraGemGame(object):
 			moves = list(self.paircomb.enumerate_valid_moves())
 			if len(moves) == 0:
 				# no moves left -- shuffle
-				print(('shuffling ...'))
+				#print(('shuffling ...'))
 				nshuffles += 1
 				if nshuffles > 20:
 					raise GameInvalidException('Too many shuffles')
 				boardCopy = copy.deepcopy(board)
 				self.paircomb.shuffle()
+				self.gameLog('paircomb.shuffle', self.board.copy())
 				self.updateBoard(board)
 				self.transitionBoard(boardCopy, board, type='glance')
 				continue
+			self.gameLog('moves', moves)
 			self.rng.shuffle(moves)
 			return moves
 	
 	def continueGame(self, board, move):
 		boardCopy = copy.deepcopy(board)
 		self.paircomb.run(*move)
+		self.gameLog('paircomb.run', self.board.copy())
 		self.updateBoard(board)
 		self.transitionBoard(boardCopy, board)
 		self.comb.set_last_interaction(*move)
@@ -419,6 +432,7 @@ class UltraGemGame(object):
 
 		# combining phase
 		anychange = self.comb.run()
+		self.gameLog('comb', self.board.copy())
 		if anychange:
 			# have to find the differences and transition
 			# using fire
@@ -429,6 +443,7 @@ class UltraGemGame(object):
 		
 		#print(('STEP %d: activation...' % nstep))
 		anychange = self.acto.run() or anychange
+		self.gameLog('acto', self.board.copy())
 		if anychange:
 			boardCopy = copy.deepcopy(board)
 			self.updateBoard(board)
@@ -742,14 +757,56 @@ class UltraGemGame(object):
 					return (x, y) # Return board x and y where the click occurred.
 		return None # Click was not on the board.
 
+	def gameLog(self, movement, newdata):
+		self.boardlog.append((movement, newdata))
+
 	def checkForLinkClick(self, pos):
 		# See if the mouse click was on the board
 		if self.contactButton.collidepoint(pos[0], pos[1]):
 			#try:
 				import webbrowser
 				import urllib
+				if hasattr(urllib, 'urlencode'):
+					urlencode = urllib.urlencode
+				else:
+					urlencode = urllib.parse.urlencode
+				
+				logtxts = []
+				lastBoard = None
+				nevents_processed = 0
+				for i, (movement, newdata) in enumerate(self.boardlog, 1):
+					if movement == 'moves':
+						logtxt = "\n%d. possible moves:" % i
+						for move, score in newdata:
+							logtxt += "\n* %d,%d -> %d,%d" % (move)
+						logtxts.append(logtxt)
+						continue
+					if lastBoard is not None and newdata == lastBoard:
+						logtxts.append("%d: %s (no change)" % (i, movement))
+						continue
+					logtxt = "%d: after %s:\n```\n%s\n```\n" % (i, movement, newdata)
+					lastBoard = newdata
+				
+					for type, value in newdata.events[nevents_processed:]:
+						logtxt += "* Event: %s - %s\n" % (type, value)
+					logtxts.append(logtxt)
+					nevents_processed = len(newdata.events)
+				logtxt = ''
+				for logtxti in logtxts[::-1]:
+					if len(logtxt) + len(logtxti) > 5000:
+						break
+					logtxt += '\n'
+					logtxt += logtxti
+				print(len(logtxt))
 				body = """
 Hi!
+
+My issue/suggestion/question/ is ...
+
+
+
+Debug information
+---------------------------------
 
 I was playing this board:
 ```
@@ -757,13 +814,12 @@ I was playing this board:
 ```
 with %d colors, %d swaps. Goal %d of type=%d.
 
-My issue/suggestion/question/ is ...
+My last moves were:
 
-
-
-""" % (str(self.board), self.ncolors, self.maxswaps, self.goalvalue, self.goalid)
-				title = 'Level %d' % self.gameid
-				webbrowser.open("https://github.com/JohannesBuchner/ultragem/issues/new?%s" % (urllib.parse.urlencode(dict(body=body, title=title))))
+%s
+""" % (str(self.board), self.ncolors, self.maxswaps, self.goalvalue, self.goalid, logtxt)
+				#title = 'Level %d' % self.gameid
+				webbrowser.open("https://github.com/JohannesBuchner/ultragem/issues/new?%s" % (urlencode(dict(body=body))))
 			#except Exception:
 			#	pass
 	

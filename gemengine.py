@@ -69,6 +69,12 @@ class Board(object):
 		b.events = list(self.events)
 		return b
 	
+	def __eq__(self, other):
+		return self.shape == other.shape and \
+			(self.type == other.type).all() and \
+			(self.color == other.color).all() and \
+			(self.status == other.status).all()
+	
 	def __str__(self):
 		#return 'BOARD:'
 		t = 'BOARD: %dx%d\n' % (self.type.shape)
