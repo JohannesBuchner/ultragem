@@ -942,6 +942,11 @@ class Combiner(object):
 				# the preferred location is to, from or random otherwise
 				k = numpy.random.randint(len(rows))
 				j, i = rows[k], cols[k]
+				# draw again to avoid replacing something
+				if self.board.type[j,i] > 1:
+					k = numpy.random.randint(len(rows))
+					j, i = rows[k], cols[k]
+				
 				if self.toi is not None and mask[self.toj,self.toi]:
 					j, i = self.toj,self.toi
 				elif self.fromi is not None and mask[self.fromj,self.fromi]:
