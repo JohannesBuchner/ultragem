@@ -1,9 +1,9 @@
 BOARD: 8x8
-            X3L X1L             
-=1L X0L |2L |2L X4L X4L X3L X4L 
-            |3L |3L             
-            |2L X3L             
-            X1L X0L             
-            |3L X0L             
-X4L X4L X0L X4L X1L |1L |3L X2L 
-X0L |0L =3L X4L X0L =2L =1L X4L 
+            X4L X2L             
+=2L X1L |3L |3L X5L X5L X4L X5L 
+            |4L |4L             
+            |3L X4L             
+            X2L X1L             
+            |4L X1L             
+X5L X5L X1L X5L X2L |2L |4L X3L 
+X1L |1L =4L X5L X1L =3L =2L X5L 

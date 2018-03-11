@@ -1,15 +1,15 @@
 NCOLORS: 6
-MAXSWAPS: 20
-GOALNAME: score
-GOALID: 0
-NMIN: 237
-DIFFICULTY: 0.70
+MAXSWAPS: 39
+GOALNAME: nbomb
+GOALID: 4
+NMIN: 2
+DIFFICULTY: 1.00
 BOARD: 8x8
                                 
                                 
+|3L |3L |6L |4L |2L =3L X3L |2L 
                                 
                                 
                                 
- BL  BL  BL  BL  BL  BL  BL  BL 
                                 
- BL  BL  BL  BL  BL  BL  BL  BL 
+                                

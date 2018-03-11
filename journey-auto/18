@@ -1,7 +1,7 @@
 NCOLORS: 4
-MAXSWAPS: 36
-GOALNAME: 52
-GOALID: 10
+MAXSWAPS: 20
+GOALNAME: 44
+GOALID: 8
 NMIN: 1
 DIFFICULTY: 0.00
 BOARD: 8x8
@@ -10,6 +10,6 @@ BOARD: 8x8
                                 
                                 
                                 
-|1L |0L =2L |1L X0L |3L X3L =1L 
                                 
                                 
+|1L |2L X3L X2L X4L =3L |1L =4L 

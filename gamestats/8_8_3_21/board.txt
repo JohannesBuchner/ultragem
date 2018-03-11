@@ -1,9 +1,0 @@
-BOARD: 8x8
-             X                  
-             X                  
-             X                  
-             X                  
-             X                  
-             X                  
-             X                  
-             X                  

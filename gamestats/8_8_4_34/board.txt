@@ -4,6 +4,6 @@ BOARD: 8x8
                                 
                                 
                                 
-|1L |0L =2L |1L X0L |3L X3L =1L 
+|2L |1L =3L |2L X1L |4L X4L =2L 
                                 
                                 

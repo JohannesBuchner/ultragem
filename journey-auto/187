@@ -1,15 +1,15 @@
 NCOLORS: 5
-MAXSWAPS: 10
-GOALNAME: score
-GOALID: 0
-NMIN: 466
-DIFFICULTY: 0.75
+MAXSWAPS: 20
+GOALNAME: nstripe
+GOALID: 3
+NMIN: 5
+DIFFICULTY: 0.60
 BOARD: 8x8
-                                
-                                
-                                
-                                
-                                
-|0L |4L =3L |3L X0L |0L X2L =4L 
-                                
-                                
+     X                   X      
+     X                   X      
+     X                   X      
+     X                   X      
+     X                   X      
+     X                   X      
+     X                   X      
+     X                   X      

@@ -1,0 +1,9 @@
+BOARD: 8x8
+=3L                         =1L 
+|4L                         =6L 
+X4L                         =1L 
+=2L                         # L 
+X5L                         |6L 
+X2L                         X3L 
+|1L                         X2L 
+X5L                         X2L 

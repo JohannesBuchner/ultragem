@@ -1,7 +1,7 @@
 BOARD: 8x8
                                 
                                 
-|2L |2L |5L |3L |1L =2L X2L |1L 
+|3L |3L |6L |4L |2L =3L X3L |2L 
                                 
                                 
                                 

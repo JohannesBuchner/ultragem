@@ -1,15 +1,15 @@
-NCOLORS: 6
-MAXSWAPS: 12
-GOALNAME: score
-GOALID: 0
-NMIN: 361
-DIFFICULTY: 0.95
+NCOLORS: 4
+MAXSWAPS: 16
+GOALNAME: nzapper
+GOALID: 5
+NMIN: 2
+DIFFICULTY: 0.50
 BOARD: 8x8
                                 
                                 
                                 
                                 
                                 
-|2L =3L |5L =2L =3L X5L =1L X4L 
+     X       X       X       X  
                                 
-                                
+     X       X       X       X  

@@ -1,15 +1,15 @@
-NCOLORS: 5
-MAXSWAPS: 11
-GOALNAME: nunlocked
-GOALID: 2
-NMIN: 2
-DIFFICULTY: 0.50
+NCOLORS: 4
+MAXSWAPS: 38
+GOALNAME: nzapper
+GOALID: 5
+NMIN: 18
+DIFFICULTY: 0.75
 BOARD: 8x8
- BL  BL                         
- BL  BL                         
- BL  BL                         
- BL  BL                         
- BL  BL                         
- BL  BL                         
- BL  BL                         
- BL  BL                         
+    =1L     # L # L     # L     
+    # L     =3L |1L     |4L     
+    # L     X4L |1L     X2L     
+    # L     |4L X4L     X2L     
+    |3L     # L X4L     X3L     
+    # L     |4L |1L     X4L     
+    =4L     =4L |3L     # L     
+    |1L     # L # L     X3L     

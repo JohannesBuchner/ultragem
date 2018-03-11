@@ -1,15 +1,15 @@
-NCOLORS: 6
-MAXSWAPS: 32
-GOALNAME: nzapper
-GOALID: 5
-NMIN: 5
-DIFFICULTY: 0.80
+NCOLORS: 5
+MAXSWAPS: 30
+GOALNAME: nbomb
+GOALID: 4
+NMIN: 2
+DIFFICULTY: 0.50
 BOARD: 8x8
-        # L         =5L         
-        X4L         =4L         
-        # L         =3L         
-        |1L         |3L         
-        X5L         X1L         
-        =0L         # L         
-        # L         =2L         
-        |3L         |1L         
+ X                           X  
+ X           BL              X  
+ X                           X  
+ X           BL              X  
+ X                           X  
+ X           BL              X  
+ X                           X  
+ X   X   X   XL  X   X   X   X  

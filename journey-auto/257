@@ -1,15 +1,15 @@
-NCOLORS: 5
-MAXSWAPS: 17
-GOALNAME: 22
-GOALID: 6
-NMIN: 1
-DIFFICULTY: 1.00
+NCOLORS: 6
+MAXSWAPS: 10
+GOALNAME: nstripe
+GOALID: 3
+NMIN: 10
+DIFFICULTY: 0.20
 BOARD: 8x8
-            X3L X1L             
-=1L X0L |2L |2L X4L X4L X3L X4L 
-            |3L |3L             
-            |2L X3L             
-            X1L X0L             
-            |3L X0L             
-X4L X4L X0L X4L X1L |1L |3L X2L 
-X0L |0L =3L X4L X0L =2L =1L X4L 
+                |2L     X2L     
+                =4L     =4L     
+                |3L     |6L     
+                X5L     |6L     
+                |4L     =1L     
+                =5L     |5L     
+                X1L     X6L     
+                X6L     X2L     

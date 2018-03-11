@@ -1,0 +1,15 @@
+NCOLORS: 4
+MAXSWAPS: 25
+GOALNAME: score
+GOALID: 0
+NMIN: 1408
+DIFFICULTY: 0.40
+BOARD: 8x8
+                                
+     BL                  BL     
+                                
+     BL                  BL     
+                                
+     BL                  BL     
+                                
+     BL                  BL     

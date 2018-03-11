@@ -978,8 +978,11 @@ My last moves were:
 
 if __name__ == '__main__':
 	try:
-		gameid = int(open('currentgame', 'r').read())
+		if len(sys.argv) > 1:
+			gameid = int(sys.argv[1])
+		else:
+			gameid = int(open('currentgame', 'r').read())
 	except Exception:
-		gameid = 1 #int(sys.argv[1])
+		gameid = 1
 	game = UltraGemGame(gameid=gameid)
 	game.run()

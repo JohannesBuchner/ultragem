@@ -198,7 +198,7 @@ class InitialFillerDoubleLockSpecial(InitialFiller):
 		selshape = self.board.status[rows, cols].shape
 		self.board.status[rows, cols] = 2
 		self.board.type[rows, cols] = self.rng.choice(self.types, size=selshape)
-		self.board.color[rows, cols] = self.rng.randint(self.ncolors, size=selshape)
+		self.board.color[rows, cols] = 1 + self.rng.randint(self.ncolors, size=selshape)
 	
 class TopFiller(object):
 	"""
@@ -306,6 +306,15 @@ class BoardGravityPuller(object):
 		self.board.type[fromj, fromi] = 0
 		self.board.color[fromj, fromi] = 0
 		self.board.status[fromj, fromi] = 0
+	
+	def is_droppable(self, j, i):
+		board = self.board
+		# locked and colored -> frozen:
+		if board.status[j,i] > 0 and board.color[j,i] > 0:
+			return False
+		# locked and not colored (colorless fillers) -> free
+		# make sure not an empty/unusable field:
+		return board.type[j,i] > 0
 		
 	def run(self):
 		board = self.board
@@ -320,7 +329,9 @@ class BoardGravityPuller(object):
 					if board.type[j-1,i] == 0 and board.status[j-1,i] == 0:
 						# above is also empty
 						continue
-					if board.type[j-1,i] > 0:
+					# status > 0 can not fall if colored
+					# color == 0 and status >= 1 can fall
+					if self.is_droppable(j-1,i):
 						self.drop(j-1,i,j,i)
 						changed.append([j,i,'dropped from top'])
 						continue
@@ -331,11 +342,11 @@ class BoardGravityPuller(object):
 					assert left != right, (left,right)
 					# maybe down-left/down-right dropping should only be allowed if
 					# the neighbor is filled (supported)
-					if 0 <= i+left < ncols and board.type[j-1,i+left] > 0 and board.type[j,i+left] > 0:
+					if 0 <= i+left < ncols and self.is_droppable(j-1,i+left) and board.type[j,i+left] > 0:
 						self.drop(j-1,i+left,j,i)
 						changed.append([j,i,'dropped from top-left' if left == -1 else 'dropped from top-right'])
 						continue
-					elif 0 <= i+right < ncols and board.type[j-1,i+right] > 0 and board.type[j,i+right] > 0:
+					elif 0 <= i+right < ncols and self.is_droppable(j-1,i+right) and board.type[j,i+right] > 0:
 						self.drop(j-1,i+right,j,i)
 						changed.append([j,i,'dropped from top-left' if right == -1 else 'dropped from top-right'])
 						continue
